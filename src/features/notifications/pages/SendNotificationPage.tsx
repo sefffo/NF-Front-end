@@ -7,9 +7,9 @@ import { Send, CheckCircle2, AlertCircle, AlertTriangle } from 'lucide-react';
 import { NotificationChannel, NotificationPriority } from '../../../types/notification';
 import { notificationsApi } from '../api/notificationsApi';
 import { sendEmail } from '../api/emailApi';
-import { TenantContext } from '../../../app/providers';
+import { AuthContext, TenantContext } from '../../../app/providers';
 
-// ─── UI feedback state ────────────────────────────────────────────────────────
+// ─── UI feedback state ─────────────────────────────────────────────────────────
 type UiState =
   | { kind: 'idle' }
   | { kind: 'loading' }
@@ -29,22 +29,33 @@ function parseRecipients(raw: string): string[] {
 export const SendNotificationPage: React.FC = () => {
   const navigate = useNavigate();
   const tenantCtx = useContext(TenantContext);
+  const authCtx   = useContext(AuthContext);
 
-  const [channel, setChannel] = useState<NotificationChannel>('EMAIL');
+  const [channel, setChannel]     = useState<NotificationChannel>('EMAIL');
   const [recipient, setRecipient] = useState('');
-  const [subject, setSubject] = useState('');
-  const [content, setContent] = useState('');
-  const [priority, setPriority] = useState<NotificationPriority>('MEDIUM');
-  const [isHtml, setIsHtml] = useState(false);
-  const [ui, setUi] = useState<UiState>({ kind: 'idle' });
+  const [subject, setSubject]     = useState('');
+  const [content, setContent]     = useState('');
+  const [priority, setPriority]   = useState<NotificationPriority>('MEDIUM');
+  const [isHtml, setIsHtml]       = useState(false);
+  const [ui, setUi]               = useState<UiState>({ kind: 'idle' });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setUi({ kind: 'loading' });
 
-    // ── EMAIL channel → call real backend POST /api/notifications/email ────────
+    // ── EMAIL channel → call real backend POST /api/notifications/email ───────────
     if (channel === 'EMAIL') {
+      const tenantId     = tenantCtx?.activeTenant?.id ?? '';
+      const applicationId = tenantCtx?.activeTenant?.applicationId ?? '';
+
+      if (!tenantId) {
+        setUi({ kind: 'error', message: 'No active tenant selected. Please select a tenant first.' });
+        return;
+      }
+
       const result = await sendEmail({
+        tenantId,
+        applicationId,
         to: parseRecipients(recipient),
         subject,
         body: content,
@@ -78,7 +89,7 @@ export const SendNotificationPage: React.FC = () => {
     try {
       const res = await notificationsApi.sendNotification({
         tenantId: tenantCtx?.activeTenant?.id || 'tnt_acme',
-        applicationId: 'app_marketing_hub',
+        applicationId: authCtx?.user?.applicationId || 'app_marketing_hub',
         channel,
         recipient,
         subject: undefined,
@@ -95,7 +106,7 @@ export const SendNotificationPage: React.FC = () => {
     }
   };
 
-  // ── field-level validation error helper ───────────────────────────────────────
+  // ── field-level validation error helper ──────────────────────────────────────
   const fieldError = (field: string): string | undefined => {
     if (ui.kind !== 'validation') return undefined;
     const msgs =
