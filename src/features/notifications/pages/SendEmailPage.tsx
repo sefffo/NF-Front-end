@@ -3,18 +3,18 @@ import { PageHeader } from '../../../components/layout/PageHeader';
 import { Input } from '../../../components/common/Input';
 import { Button } from '../../../components/common/Button';
 import { Send, CheckCircle2, AlertCircle, AlertTriangle } from 'lucide-react';
-import { sendEmail, SendEmailRequest, ValidationErrorResponse } from '../api/emailApi';
+import { sendEmail, SendEmailRequest, EmailApiResult } from '../api/emailApi';
 
-// ─── State ────────────────────────────────────────────────────────────────────
+// ─── UI State machine ─────────────────────────────────────────────────────────
 type UiState =
   | { kind: 'idle' }
   | { kind: 'loading' }
-  | { kind: 'success'; messageId: string }
-  | { kind: 'validation'; errors: ValidationErrorResponse }
-  | { kind: 'domain'; message: string }
+  | { kind: 'success'; messageId: string; requestId: string }
+  | { kind: 'validation'; errors: Record<string, string[]> }
+  | { kind: 'domain'; title: string; detail: string }
   | { kind: 'error'; message: string };
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 function parseRecipients(raw: string): string[] {
   return raw
     .split(/[,;\n]+/)
@@ -22,14 +22,31 @@ function parseRecipients(raw: string): string[] {
     .filter(Boolean);
 }
 
-// ─── Component ───────────────────────────────────────────────────────────────
+function resultToUiState(result: EmailApiResult): UiState {
+  if (result.ok) {
+    return { kind: 'success', messageId: result.data.messageId, requestId: result.data.requestId };
+  }
+  if (result.status === 400) {
+    return { kind: 'validation', errors: result.errors };
+  }
+  if (result.status === 422 || result.status === 403) {
+    return { kind: 'domain', title: result.title, detail: result.detail };
+  }
+  return { kind: 'error', message: result.message };
+}
+
+// ─── Component ────────────────────────────────────────────────────────────────
 export const SendEmailPage: React.FC = () => {
-  const [to, setTo] = useState('');
-  const [subject, setSubject] = useState('');
-  const [body, setBody] = useState('');
-  const [from, setFrom] = useState('');
-  const [isHtml, setIsHtml] = useState(false);
-  const [templateName, setTemplateName] = useState('');
+  // Form fields
+  const [tenantId, setTenantId]       = useState('');
+  const [applicationId, setApplicationId] = useState('');
+  const [to, setTo]                   = useState('');
+  const [subject, setSubject]         = useState('');
+  const [body, setBody]               = useState('');
+  const [from, setFrom]               = useState('');
+  const [isHtml, setIsHtml]           = useState(false);
+  const [idempotencyKey, setIdempotencyKey] = useState('');
+
   const [ui, setUi] = useState<UiState>({ kind: 'idle' });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -37,76 +54,65 @@ export const SendEmailPage: React.FC = () => {
     setUi({ kind: 'loading' });
 
     const payload: SendEmailRequest = {
+      tenantId: tenantId.trim(),
+      applicationId: applicationId.trim(),
       to: parseRecipients(to),
-      subject,
-      body,
+      subject: subject.trim(),
+      body: body.trim(),
       ...(from.trim() && { from: from.trim() }),
       isHtml,
-      ...(templateName.trim() && { templateName: templateName.trim() }),
+      ...(idempotencyKey.trim() && { idempotencyKey: idempotencyKey.trim() }),
     };
 
     const result = await sendEmail(payload);
+    setUi(resultToUiState(result));
 
     if (result.ok) {
-      setUi({ kind: 'success', messageId: result.data.messageId });
-      // Reset form
       setTo('');
       setSubject('');
       setBody('');
       setFrom('');
       setIsHtml(false);
-      setTemplateName('');
-      return;
+      setIdempotencyKey('');
     }
-
-    if (result.status === 400) {
-      setUi({ kind: 'validation', errors: result.errors });
-      return;
-    }
-
-    if (result.status === 422) {
-      setUi({ kind: 'domain', message: result.message });
-      return;
-    }
-
-    setUi({ kind: 'error', message: result.message });
   };
+
+  const validationErr = (field: string) =>
+    ui.kind === 'validation' ? ui.errors[field] ?? ui.errors[field.toLowerCase()] : undefined;
 
   return (
     <div className="page-container-inner">
       <PageHeader
         title="Send Email Notification"
-        subtitle="Dispatch a direct email using the notification backend"
+        subtitle="Dispatch an email via the notification backend"
       />
 
-      {/* ── Success banner ── */}
+      {/* ── 200 Success ── */}
       {ui.kind === 'success' && (
         <div className="alert alert-success mb-4">
           <CheckCircle2 size={18} />
           <span>
             Email sent successfully.{' '}
             <strong>Message ID: {ui.messageId}</strong>
+            {ui.requestId && (
+              <span className="text-muted text-xs ml-2">(Request: {ui.requestId})</span>
+            )}
           </span>
         </div>
       )}
 
-      {/* ── Domain error banner (422) ── */}
+      {/* ── 422 / 403 Domain error ── */}
       {ui.kind === 'domain' && (
         <div className="alert alert-error mb-4">
           <AlertTriangle size={18} />
-          <span>{ui.message}</span>
+          <div className="flex flex-col gap-0.5">
+            <span className="font-semibold">{ui.title}</span>
+            <span className="text-sm">{ui.detail}</span>
+          </div>
         </div>
       )}
 
-      {/* ── Generic error banner ── */}
-      {ui.kind === 'error' && (
-        <div className="alert alert-error mb-4">
-          <AlertCircle size={18} />
-          <span>{ui.message}</span>
-        </div>
-      )}
-
-      {/* ── Validation errors banner (400) ── */}
+      {/* ── 400 Validation errors ── */}
       {ui.kind === 'validation' && (
         <div className="alert alert-warning mb-4">
           <AlertCircle size={18} />
@@ -122,8 +128,43 @@ export const SendEmailPage: React.FC = () => {
         </div>
       )}
 
+      {/* ── Generic / network error ── */}
+      {ui.kind === 'error' && (
+        <div className="alert alert-error mb-4">
+          <AlertCircle size={18} />
+          <span>{ui.message}</span>
+        </div>
+      )}
+
       <div className="card card-padded max-w-2xl">
         <form onSubmit={handleSubmit} className="form-stack">
+
+          {/* Tenant ID */}
+          <Input
+            label="Tenant ID"
+            value={tenantId}
+            onChange={(e) => setTenantId(e.target.value)}
+            placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+            required
+            className={validationErr('tenantId') ? 'input-error' : ''}
+          />
+          {validationErr('tenantId') && (
+            <p className="input-error-msg -mt-2">{validationErr('tenantId')!.join(', ')}</p>
+          )}
+
+          {/* Application ID */}
+          <Input
+            label="Application ID"
+            value={applicationId}
+            onChange={(e) => setApplicationId(e.target.value)}
+            placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+            required
+            className={validationErr('applicationId') ? 'input-error' : ''}
+          />
+          {validationErr('applicationId') && (
+            <p className="input-error-msg -mt-2">{validationErr('applicationId')!.join(', ')}</p>
+          )}
+
           {/* Recipients */}
           <div className="input-group">
             <label className="input-label">
@@ -131,7 +172,7 @@ export const SendEmailPage: React.FC = () => {
             </label>
             <textarea
               className={`input-field textarea-field${
-                ui.kind === 'validation' && ui.errors['to'] ? ' input-error' : ''
+                validationErr('to') ? ' input-error' : ''
               }`}
               rows={2}
               value={to}
@@ -139,8 +180,8 @@ export const SendEmailPage: React.FC = () => {
               placeholder="alice@example.com, bob@example.com"
               required
             />
-            {ui.kind === 'validation' && ui.errors['to'] && (
-              <p className="input-error-msg">{ui.errors['to'].join(', ')}</p>
+            {validationErr('to') && (
+              <p className="input-error-msg">{validationErr('to')!.join(', ')}</p>
             )}
           </div>
 
@@ -151,10 +192,10 @@ export const SendEmailPage: React.FC = () => {
             onChange={(e) => setSubject(e.target.value)}
             placeholder="e.g. Account Security Alert"
             required
-            className={ui.kind === 'validation' && ui.errors['subject'] ? 'input-error' : ''}
+            className={validationErr('subject') ? 'input-error' : ''}
           />
-          {ui.kind === 'validation' && ui.errors['subject'] && (
-            <p className="input-error-msg -mt-2">{ui.errors['subject'].join(', ')}</p>
+          {validationErr('subject') && (
+            <p className="input-error-msg -mt-2">{validationErr('subject')!.join(', ')}</p>
           )}
 
           {/* From (optional) */}
@@ -170,25 +211,29 @@ export const SendEmailPage: React.FC = () => {
             <label className="input-label">Body</label>
             <textarea
               className={`input-field textarea-field${
-                ui.kind === 'validation' && ui.errors['body'] ? ' input-error' : ''
+                validationErr('body') ? ' input-error' : ''
               }`}
               rows={6}
               value={body}
               onChange={(e) => setBody(e.target.value)}
-              placeholder={isHtml ? '<h1>Hello!</h1><p>Your message here...</p>' : 'Plain text message...'}
+              placeholder={
+                isHtml
+                  ? '<h1>Hello!</h1><p>Your message here...</p>'
+                  : 'Plain text message...'
+              }
               required
             />
-            {ui.kind === 'validation' && ui.errors['body'] && (
-              <p className="input-error-msg">{ui.errors['body'].join(', ')}</p>
+            {validationErr('body') && (
+              <p className="input-error-msg">{validationErr('body')!.join(', ')}</p>
             )}
           </div>
 
-          {/* Template name (optional) */}
+          {/* Idempotency Key (optional) */}
           <Input
-            label={<>Template Name <span className="text-muted text-xs">(optional)</span></>}
-            value={templateName}
-            onChange={(e) => setTemplateName(e.target.value)}
-            placeholder="e.g. welcome-email"
+            label={<>Idempotency Key <span className="text-muted text-xs">(optional — prevents duplicate sends)</span></>}
+            value={idempotencyKey}
+            onChange={(e) => setIdempotencyKey(e.target.value)}
+            placeholder="e.g. order-123-welcome"
           />
 
           {/* isHtml toggle */}
