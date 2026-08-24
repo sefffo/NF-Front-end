@@ -3,14 +3,14 @@ import { AxiosError } from 'axios';
 
 // ─── Request DTO (mirrors SendEmailNotificationCommand) ───────────────────────
 export interface SendEmailRequest {
-  tenantId: string;       // Required — the tenant making the request
-  applicationId: string;  // Required — the application sending the email
-  to: string[];           // Required, min 1 valid email address
-  subject: string;        // Required, max 998 chars
-  body: string;           // Required
-  from?: string;          // Optional sender override
-  isHtml?: boolean;       // Defaults to false
-  idempotencyKey?: string; // Optional — prevents duplicate sends
+  tenantId: string;
+  applicationId: string;
+  to: string[];
+  subject: string;
+  body: string;
+  from?: string;
+  isHtml?: boolean;
+  idempotencyKey?: string;
 }
 
 // ─── Success Response ─────────────────────────────────────────────────────────
@@ -37,13 +37,11 @@ export async function sendEmail(payload: SendEmailRequest): Promise<EmailApiResu
     const status = axiosErr.response?.status ?? 0;
     const responseData = axiosErr.response?.data as Record<string, unknown> | undefined;
 
-    // 400 — ASP.NET Core ValidationProblemDetails: { errors: { FieldName: string[] } }
     if (status === 400) {
       const errors = (responseData?.['errors'] ?? {}) as Record<string, string[]>;
       return { ok: false, status: 400, errors };
     }
 
-    // 422 or 403 — ASP.NET Core ProblemDetails: { title, detail }
     if (status === 422 || status === 403) {
       return {
         ok: false,
@@ -53,7 +51,6 @@ export async function sendEmail(payload: SendEmailRequest): Promise<EmailApiResu
       };
     }
 
-    // Fallback — 401, 500, network errors
     return {
       ok: false,
       status,
