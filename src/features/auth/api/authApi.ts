@@ -1,52 +1,107 @@
-import { LoginCredentials, AuthResponse, AuthUser } from '../../../types/auth';
+import axios, { AxiosError } from 'axios';
 
-// Mock initial super admin user for demo/scaffold
-export const MOCK_USER: AuthUser = {
-  id: 'usr_super_1',
-  email: 'admin@notifications.io',
-  firstName: 'Alexander',
-  lastName: 'Vance',
-  role: 'SUPER_ADMIN',
-  avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250',
-  permissions: {
-    canManageTenants: true,
-    canManageApplications: true,
-    canManageUsers: true,
-    canManageRoles: true,
-    canConfigureProviders: true,
-    canSendNotifications: true,
-    canViewHistory: true,
-    canViewAnalytics: true,
-  },
-};
+// ─── POST /api/auth/login ─────────────────────────────────────────────────────────
+// Mirrors LoginCommand.cs
+export interface LoginCommand {
+  email: string;
+  password: string;
+}
 
-export const authApi = {
-  login: async (credentials: LoginCredentials): Promise<AuthResponse> => {
-    // Simulated delay
-    await new Promise((r) => setTimeout(r, 600));
+// Mirrors AuthenticatedUserResponse.cs
+export interface AuthenticatedUserResponse {
+  userId: string;
+  email: string;
+  fullName: string;
+  roles: string[];
+  tenantId: string | null;
+  applicationId: string | null;
+}
 
-    let role: AuthUser['role'] = 'SUPER_ADMIN';
-    if (credentials.email.includes('tenant')) role = 'TENANT_ADMIN';
-    if (credentials.email.includes('user')) role = 'USER';
+// Mirrors LoginResponse.cs
+export interface LoginResponse {
+  accessToken: string;   // ← stored as 'auth_token' for axios interceptor
+  refreshToken: string;  // ← stored as 'refresh_token'
+  expiresIn: number;     // seconds
+  user: AuthenticatedUserResponse;
+}
 
-    const user: AuthUser = {
-      ...MOCK_USER,
-      email: credentials.email,
-      role,
-    };
+// ─── POST /api/auth/refresh ─────────────────────────────────────────────────────
+export interface RefreshTokenCommand {
+  refreshToken: string;
+}
 
-    return {
-      token: 'mock_jwt_token_' + Date.now(),
-      refreshToken: 'mock_refresh_token_' + Date.now(),
-      user,
-    };
-  },
+export interface RefreshTokenResponse {
+  accessToken: string;
+  refreshToken: string;
+  expiresIn: number;
+}
 
-  getCurrentUser: async (): Promise<AuthUser> => {
-    return MOCK_USER;
-  },
+// ─── POST /api/auth/logout ─────────────────────────────────────────────────────
+export interface LogoutCommand {
+  refreshToken: string;
+}
 
-  logout: async (): Promise<void> => {
+// ─── Result wrapper ──────────────────────────────────────────────────────────────
+export type AuthApiResult<T> =
+  | { ok: true;  data: T }
+  | { ok: false; status: number; message: string };
+
+// ─── Unauthenticated axios client (no Bearer header) ────────────────────────────
+const authClient = axios.create({
+  baseURL: import.meta.env.VITE_API_BASE_URL ?? '/api',
+  headers: { 'Content-Type': 'application/json' },
+  timeout: 10_000,
+});
+
+function extractMessage(err: AxiosError): { status: number; message: string } {
+  const rd = err.response?.data as Record<string, unknown> | undefined;
+  return {
+    status: err.response?.status ?? 0,
+    message:
+      (rd?.['detail'] as string) ??
+      (rd?.['title']  as string) ??
+      err.message ??
+      'Unknown error',
+  };
+}
+
+// ─── login() ─────────────────────────────────────────────────────────────────────
+// Stores accessToken as 'auth_token' — the key the axios interceptor reads.
+// Stores refreshToken as 'refresh_token' for later token refresh calls.
+export async function login(
+  command: LoginCommand
+): Promise<AuthApiResult<LoginResponse>> {
+  try {
+    const { data } = await authClient.post<LoginResponse>('/auth/login', command);
+    localStorage.setItem('auth_token',    data.accessToken);
+    localStorage.setItem('refresh_token', data.refreshToken);
+    return { ok: true, data };
+  } catch (err) {
+    return { ok: false, ...extractMessage(err as AxiosError) };
+  }
+}
+
+// ─── refreshToken() ───────────────────────────────────────────────────────────────
+export async function refreshToken(
+  command: RefreshTokenCommand
+): Promise<AuthApiResult<RefreshTokenResponse>> {
+  try {
+    const { data } = await authClient.post<RefreshTokenResponse>('/auth/refresh', command);
+    localStorage.setItem('auth_token',    data.accessToken);
+    localStorage.setItem('refresh_token', data.refreshToken);
+    return { ok: true, data };
+  } catch (err) {
+    return { ok: false, ...extractMessage(err as AxiosError) };
+  }
+}
+
+// ─── logout() ─────────────────────────────────────────────────────────────────────
+// Always clears local storage regardless of server response.
+export async function logout(command: LogoutCommand): Promise<void> {
+  try {
+    await authClient.post('/auth/logout', command);
+  } finally {
     localStorage.removeItem('auth_token');
-  },
-};
+    localStorage.removeItem('refresh_token');
+  }
+}
