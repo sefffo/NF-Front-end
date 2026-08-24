@@ -29,6 +29,7 @@ import { ProviderConfigurationsPage } from '../features/providers/pages/Provider
 import { CreateProviderPage } from '../features/providers/pages/CreateProviderPage';
 
 import { SendNotificationPage } from '../features/notifications/pages/SendNotificationPage';
+import { SendEmailPage } from '../features/notifications/pages/SendEmailPage';
 import { NotificationsPage } from '../features/notifications/pages/NotificationsPage';
 import { NotificationDetailsPage } from '../features/notifications/pages/NotificationDetailsPage';
 import { NotificationHistoryPage } from '../features/notifications/pages/NotificationHistoryPage';
@@ -98,6 +99,8 @@ export const AppRouter: React.FC = () => {
             {/* Notifications (Accessible to all authenticated users) */}
             <Route path="/notifications" element={<NotificationsPage />} />
             <Route path="/notifications/send" element={<SendNotificationPage />} />
+            {/* Task 14: Send Email via real backend API */}
+            <Route path="/notifications/send-email" element={<SendEmailPage />} />
             <Route path="/notifications/history" element={<NotificationHistoryPage />} />
             <Route path="/notifications/:id" element={<NotificationDetailsPage />} />
 
