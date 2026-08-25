@@ -1,38 +1,61 @@
 import axios, { AxiosError } from 'axios';
 import type { AuthUser, AuthResponse, LoginCredentials } from '../../../types/auth';
 
-// ─── Unauthenticated axios client ───────────────────────────────────────────────────────
+// ─── Unauthenticated axios client ────────────────────────────────────────────
 const authClient = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL ?? '/api',
   headers: { 'Content-Type': 'application/json' },
   timeout: 10_000,
 });
 
-// ─── Raw backend shapes (mirror LoginResponse.cs) ───────────────────────────────
+// ─── Exact shape the backend /auth/login actually returns ────────────────────
+// Verified from live response 2026-08-25:
+// {
+//   "accessToken": "...",
+//   "refreshToken": "...",
+//   "expiresIn": 3600,
+//   "user": {
+//     "userId": "...",
+//     "email": "...",
+//     "fullName": "...",
+//     "roles": ["GlobalAdmin"],   <-- array of strings
+//     "tenantId": null | "...",
+//     "applicationId": null | "..."
+//     // NOTE: NO tenantName field in response body
+//   }
+// }
 interface BackendLoginResponse {
-  accessToken: string;
+  accessToken:  string;
   refreshToken: string;
-  expiresIn: number;
+  expiresIn:    number;
   user: {
-    userId: string;
-    email: string;
-    fullName: string;          // backend sends fullName, frontend AuthUser needs firstName + lastName
-    roles: string[];           // backend sends array, frontend AuthUser uses single role
-    tenantId: string | null;
-    tenantName: string | null; // populated for TenantAdmin users from JWT claims
+    userId:        string;
+    email:         string;
+    fullName:      string;
+    roles:         string[];        // ["GlobalAdmin"] | ["TenantAdmin"] | ["User"]
+    tenantId:      string | null;
     applicationId: string | null;
+    // tenantName is NOT returned by the backend — extracted from JWT instead
   };
 }
 
-// ─── Map backend response → frontend AuthResponse shape ────────────────────────────
+// ─── Decode JWT payload (base64url → JSON) without a library ────────────────
+function decodeJwtPayload(token: string): Record<string, unknown> {
+  try {
+    const base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    return JSON.parse(atob(base64));
+  } catch {
+    return {};
+  }
+}
+
+// ─── Map backend response → frontend AuthResponse ───────────────────────────
 function mapToAuthResponse(raw: BackendLoginResponse): AuthResponse {
-  const [firstName = '', ...rest] = (raw.user.fullName ?? '').split(' ');
+  // Split fullName → firstName + lastName
+  const [firstName = '', ...rest] = (raw.user.fullName ?? '').trim().split(' ');
   const lastName = rest.join(' ');
 
-  // Map backend role strings → frontend UserRole enum.
-  // Backend seeds two accepted aliases for the top-level admin role:
-  //   'GlobalAdmin'  (current seeder — DatabaseSeeder.cs)
-  //   'SuperAdmin'   (future / alternative naming)
+  // Normalise role: backend sends "GlobalAdmin" | "TenantAdmin" | "User"
   const rawRole = (raw.user.roles?.[0] ?? 'User').toLowerCase();
   const role =
     rawRole === 'superadmin'  ? 'SUPER_ADMIN'  as const :
@@ -40,23 +63,33 @@ function mapToAuthResponse(raw: BackendLoginResponse): AuthResponse {
     rawRole === 'tenantadmin' ? 'TENANT_ADMIN' as const :
                                 'USER'         as const;
 
+  // tenantName is NOT in the response body — decode JWT to find it.
+  // Backend embeds claim key "tenantName" (or similar) for TenantAdmin tokens.
+  const jwtPayload = decodeJwtPayload(raw.accessToken);
+  const tenantName =
+    (jwtPayload['tenantName'] as string | undefined) ??
+    (jwtPayload['tenant_name'] as string | undefined) ??
+    undefined;
+
+  const tenantId = raw.user.tenantId ?? undefined;
+
   const user: AuthUser = {
     id:         raw.user.userId,
     email:      raw.user.email,
     firstName,
     lastName,
     role,
-    tenantId:   raw.user.tenantId   ?? undefined,
-    tenantName: raw.user.tenantName ?? undefined, // fix: was missing — TenantAdmin shell used 'My Tenant' fallback
+    tenantId,
+    tenantName,
     permissions: {
-      canManageTenants:       role === 'SUPER_ADMIN',
-      canManageApplications:  role !== 'USER',
-      canManageUsers:         role !== 'USER',
-      canManageRoles:         role === 'SUPER_ADMIN',
-      canConfigureProviders:  role !== 'USER',
-      canSendNotifications:   true,
-      canViewHistory:         true,
-      canViewAnalytics:       role !== 'USER',
+      canManageTenants:      role === 'SUPER_ADMIN',
+      canManageApplications: role !== 'USER',
+      canManageUsers:        role !== 'USER',
+      canManageRoles:        role === 'SUPER_ADMIN',
+      canConfigureProviders: role !== 'USER',
+      canSendNotifications:  true,
+      canViewHistory:        true,
+      canViewAnalytics:      role !== 'USER',
     },
   };
 
@@ -70,8 +103,9 @@ function mapToAuthResponse(raw: BackendLoginResponse): AuthResponse {
 function extractMessage(err: AxiosError): string {
   const rd = err.response?.data as Record<string, unknown> | undefined;
   return (
-    (rd?.['detail'] as string) ??
-    (rd?.['title']  as string) ??
+    (rd?.['detail']  as string) ??
+    (rd?.['title']   as string) ??
+    (rd?.['message'] as string) ??
     err.message ??
     'Unknown error'
   );
