@@ -20,17 +20,16 @@ interface TenantContextType {
   refreshTenants: () => Promise<void>;
 }
 
-export const AuthContext = createContext<AuthContextType | undefined>(undefined);
+export const AuthContext   = createContext<AuthContextType | undefined>(undefined);
 export const TenantContext = createContext<TenantContextType | undefined>(undefined);
 
 // Build a minimal Tenant shell from JWT claims.
-// Used for TenantAdmin so ApplicationsPage always has a tenantId available.
-// tenantName is now correctly populated from the JWT (fixed in authApi.ts).
+// Used for TenantAdmin so ApplicationsPage always has a tenantId immediately.
 function buildTenantShellFromUser(user: AuthUser): Tenant | null {
   if (!user.tenantId) return null;
   return {
     id:     user.tenantId,
-    name:   user.tenantName ?? user.email, // fix: fall back to email if tenantName still missing
+    name:   user.tenantName ?? user.email,
     slug:   '',
     status: 'ACTIVE',
     apiKey: '',
@@ -47,68 +46,83 @@ function buildTenantShellFromUser(user: AuthUser): Tenant | null {
 }
 
 export const AppProviders: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser]                   = useState<AuthUser | null>(null);
-  const [isLoading, setIsLoading]         = useState<boolean>(true);
-  const [tenants, setTenants]             = useState<Tenant[]>([]);
-  const [activeTenant, setActiveTenant]   = useState<Tenant | null>(null);
+  const [user, setUser]                 = useState<AuthUser | null>(null);
+  const [isLoading, setIsLoading]       = useState<boolean>(true);
+  const [tenants, setTenants]           = useState<Tenant[]>([]);
+  const [activeTenant, setActiveTenant] = useState<Tenant | null>(null);
 
-  // Restore session from localStorage on mount
+  // ── Session restore on page refresh ─────────────────────────────────────────
+  // fix: was only restoring user but never rebuilding activeTenant, so
+  // ApplicationsPage showed "no tenant" banner on every refresh.
   useEffect(() => {
     const token     = localStorage.getItem('auth_token');
     const savedUser = localStorage.getItem('auth_user');
     if (token && savedUser) {
       try {
-        setUser(JSON.parse(savedUser));
+        const restoredUser: AuthUser = JSON.parse(savedUser);
+        setUser(restoredUser);
+        // Immediately rebuild tenant state from the saved user so pages that
+        // depend on activeTenant don't flash an error on refresh.
+        if (restoredUser.role === 'TENANT_ADMIN') {
+          const shell = buildTenantShellFromUser(restoredUser);
+          if (shell) {
+            setActiveTenant(shell);
+            setTenants([shell]);
+          }
+        }
+        // GlobalAdmin: tenantsApi.getTenants() will be called by the second
+        // useEffect once user state is set — no extra work needed here.
       } catch {
         localStorage.removeItem('auth_token');
+        localStorage.removeItem('refresh_token');
         localStorage.removeItem('auth_user');
       }
     }
     setIsLoading(false);
   }, []);
 
+  // ── Load tenants after login (or after session restore for GlobalAdmin) ──────
   useEffect(() => {
     if (!user) return;
 
     if (user.role === 'SUPER_ADMIN') {
-      // GlobalAdmin: fetch all tenants and set first as active
       tenantsApi
         .getTenants()
         .then((data) => {
           setTenants(data);
-          if (data.length > 0) setActiveTenant(data[0]);
+          if (data.length > 0 && !activeTenant) setActiveTenant(data[0]);
         })
         .catch((err) => {
-          // fix: was a silent swallow — log the error so it shows in devtools
-          console.error('[AppProviders] Failed to load tenants on login:', err);
-          // activeTenant stays null; ApplicationsPage shows a clear "select tenant" alert
+          console.error('[AppProviders] Failed to load tenants:', err);
         });
     } else if (user.role === 'TENANT_ADMIN') {
-      // TenantAdmin: seed activeTenant from JWT claims immediately.
-      // getTenants() returns 403 for TenantAdmin, so we never call it.
+      // TenantAdmin: getTenants() returns 403 — use JWT claims directly.
+      // Session restore already called buildTenantShellFromUser, but we also
+      // handle the fresh-login path here.
       const shell = buildTenantShellFromUser(user);
-      if (shell) {
+      if (shell && !activeTenant) {
         setActiveTenant(shell);
         setTenants([shell]);
       }
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
   const login = async (credentials: LoginCredentials) => {
     setIsLoading(true);
     try {
+      // authApi.login() now saves auth_token, refresh_token, and auth_user
+      // to localStorage before returning, so we just consume the result.
       const res = await authApi.login(credentials);
       setUser(res.user);
-      localStorage.setItem('auth_token', res.token);
-      localStorage.setItem('auth_user', JSON.stringify(res.user));
     } finally {
       setIsLoading(false);
     }
   };
 
   const logout = () => {
+    // authApi.logout() removes all three localStorage keys
     authApi.logout();
-    localStorage.removeItem('auth_user');
     setUser(null);
     setTenants([]);
     setActiveTenant(null);
@@ -124,7 +138,7 @@ export const AppProviders: React.FC<{ children: React.ReactNode }> = ({ children
       const data = await tenantsApi.getTenants();
       setTenants(data);
     }
-    // TenantAdmin has exactly one tenant (themselves) — nothing to refresh
+    // TenantAdmin has exactly one tenant — nothing to refresh
   };
 
   return (
@@ -138,7 +152,7 @@ export const AppProviders: React.FC<{ children: React.ReactNode }> = ({ children
   );
 };
 
-// ─── Convenience hooks ───────────────────────────────────────────────────────────
+// ─── Convenience hooks ────────────────────────────────────────────────────────
 export const useAuth = () => {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error('useAuth must be used inside AppProviders');

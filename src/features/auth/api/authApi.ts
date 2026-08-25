@@ -21,7 +21,6 @@ const authClient = axios.create({
 //     "roles": ["GlobalAdmin"],   <-- array of strings
 //     "tenantId": null | "...",
 //     "applicationId": null | "..."
-//     // NOTE: NO tenantName field in response body
 //   }
 // }
 interface BackendLoginResponse {
@@ -35,11 +34,10 @@ interface BackendLoginResponse {
     roles:         string[];        // ["GlobalAdmin"] | ["TenantAdmin"] | ["User"]
     tenantId:      string | null;
     applicationId: string | null;
-    // tenantName is NOT returned by the backend — extracted from JWT instead
   };
 }
 
-// ─── Decode JWT payload (base64url → JSON) without a library ────────────────
+// ─── Decode JWT payload (base64url → JSON) without a library ─────────────────
 function decodeJwtPayload(token: string): Record<string, unknown> {
   try {
     const base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
@@ -49,29 +47,28 @@ function decodeJwtPayload(token: string): Record<string, unknown> {
   }
 }
 
-// ─── Map backend response → frontend AuthResponse ───────────────────────────
+// ─── Map backend response → frontend AuthResponse ────────────────────────────
 function mapToAuthResponse(raw: BackendLoginResponse): AuthResponse {
-  // Split fullName → firstName + lastName
   const [firstName = '', ...rest] = (raw.user.fullName ?? '').trim().split(' ');
   const lastName = rest.join(' ');
 
-  // Normalise role: backend sends "GlobalAdmin" | "TenantAdmin" | "User"
+  // Backend sends "GlobalAdmin" | "TenantAdmin" | "User" — normalise to frontend enum
   const rawRole = (raw.user.roles?.[0] ?? 'User').toLowerCase();
-  const role =
-    rawRole === 'superadmin'  ? 'SUPER_ADMIN'  as const :
-    rawRole === 'globaladmin' ? 'SUPER_ADMIN'  as const :
-    rawRole === 'tenantadmin' ? 'TENANT_ADMIN' as const :
-                                'USER'         as const;
+  const role: AuthUser['role'] =
+    rawRole === 'globaladmin' ? 'SUPER_ADMIN'  :
+    rawRole === 'superadmin'  ? 'SUPER_ADMIN'  :
+    rawRole === 'tenantadmin' ? 'TENANT_ADMIN' :
+                                'USER';
 
-  // tenantName is NOT in the response body — decode JWT to find it.
-  // Backend embeds claim key "tenantName" (or similar) for TenantAdmin tokens.
-  const jwtPayload = decodeJwtPayload(raw.accessToken);
-  const tenantName =
-    (jwtPayload['tenantName'] as string | undefined) ??
+  // tenantName is NOT in the response body — decode JWT to find it
+  const jwtPayload  = decodeJwtPayload(raw.accessToken);
+  const tenantName  =
+    (jwtPayload['tenantName']  as string | undefined) ??
     (jwtPayload['tenant_name'] as string | undefined) ??
     undefined;
 
-  const tenantId = raw.user.tenantId ?? undefined;
+  const tenantId      = raw.user.tenantId      ?? undefined;
+  const applicationId = raw.user.applicationId ?? undefined;
 
   const user: AuthUser = {
     id:         raw.user.userId,
@@ -81,6 +78,7 @@ function mapToAuthResponse(raw: BackendLoginResponse): AuthResponse {
     role,
     tenantId,
     tenantName,
+    applicationId,    // fix: now populated from backend response
     permissions: {
       canManageTenants:      role === 'SUPER_ADMIN',
       canManageApplications: role !== 'USER',
@@ -114,15 +112,20 @@ function extractMessage(err: AxiosError): string {
 export const authApi = {
   async login(credentials: LoginCredentials): Promise<AuthResponse> {
     const { data } = await authClient.post<BackendLoginResponse>('/auth/login', credentials);
+    const mapped = mapToAuthResponse(data);
+    // Persist both token and full user object so session restore works on page refresh
     localStorage.setItem('auth_token',    data.accessToken);
     localStorage.setItem('refresh_token', data.refreshToken);
-    return mapToAuthResponse(data);
+    localStorage.setItem('auth_user',     JSON.stringify(mapped.user));
+    return mapped;
   },
 
   async refresh(refreshToken: string): Promise<{ token: string; refreshToken: string }> {
     const { data } = await authClient.post<BackendLoginResponse>('/auth/refresh', { refreshToken });
+    const mapped = mapToAuthResponse(data);
     localStorage.setItem('auth_token',    data.accessToken);
     localStorage.setItem('refresh_token', data.refreshToken);
+    localStorage.setItem('auth_user',     JSON.stringify(mapped.user));
     return { token: data.accessToken, refreshToken: data.refreshToken };
   },
 
@@ -135,6 +138,7 @@ export const authApi = {
     } finally {
       localStorage.removeItem('auth_token');
       localStorage.removeItem('refresh_token');
+      localStorage.removeItem('auth_user');
     }
   },
 };

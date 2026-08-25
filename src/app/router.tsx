@@ -36,15 +36,15 @@ import { NotificationHistoryPage } from '../features/notifications/pages/Notific
 
 import { ProfilePage } from '../features/profile/pages/ProfilePage';
 
-// Component to dynamically route to role-appropriate dashboard
+// ─── Route to the correct dashboard based on the logged-in user's role ────────
 const DashboardRoleRouter: React.FC = () => {
   const { user } = useAuth();
-  if (user?.role === 'SUPER_ADMIN') return <SuperAdminDashboard />;
+  if (user?.role === 'SUPER_ADMIN')  return <SuperAdminDashboard />;
   if (user?.role === 'TENANT_ADMIN') return <TenantAdminDashboard />;
   return <UserDashboard />;
 };
 
-// Redirect authenticated users away from the login page
+// ─── Block authenticated users from reaching the login page again ─────────────
 const PublicOnlyRoute: React.FC<{ element: React.ReactElement }> = ({ element }) => {
   const { isAuthenticated, isLoading } = useAuth();
   if (isLoading) return null;
@@ -55,61 +55,60 @@ export const AppRouter: React.FC = () => {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Public Routes */}
+        {/* ── Public ────────────────────────────────────────────────────────── */}
         <Route path="/login" element={<PublicOnlyRoute element={<LoginPage />} />} />
 
-        {/* Protected Dashboard Layout */}
+        {/* ── Protected (must be logged in) ────────────────────────────────── */}
         <Route element={<ProtectedRoute />}>
           <Route element={<DashboardLayout />}>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<DashboardRoleRouter />} />
 
-            {/* Tenants (Super Admin only) */}
+            {/* Tenants — GlobalAdmin (SUPER_ADMIN) only */}
             <Route element={<RoleGuard allowedRoles={['SUPER_ADMIN']} />}>
-              <Route path="/tenants" element={<TenantsPage />} />
+              <Route path="/tenants"        element={<TenantsPage />} />
               <Route path="/tenants/create" element={<CreateTenantPage />} />
-              <Route path="/tenants/:id" element={<TenantDetailsPage />} />
+              <Route path="/tenants/:id"    element={<TenantDetailsPage />} />
             </Route>
 
-            {/* Applications (Super Admin & Tenant Admin) */}
+            {/* Applications — GlobalAdmin + TenantAdmin */}
             <Route element={<RoleGuard allowedRoles={['SUPER_ADMIN', 'TENANT_ADMIN']} />}>
-              <Route path="/applications" element={<ApplicationsPage />} />
+              <Route path="/applications"        element={<ApplicationsPage />} />
               <Route path="/applications/create" element={<CreateApplicationPage />} />
-              <Route path="/applications/:id" element={<ApplicationDetailsPage />} />
+              <Route path="/applications/:id"    element={<ApplicationDetailsPage />} />
             </Route>
 
-            {/* Users (Super Admin & Tenant Admin) */}
+            {/* Users — GlobalAdmin + TenantAdmin */}
             <Route element={<RoleGuard allowedRoles={['SUPER_ADMIN', 'TENANT_ADMIN']} />}>
-              <Route path="/users" element={<UsersPage />} />
-              <Route path="/users/create" element={<CreateUserPage />} />
+              <Route path="/users"          element={<UsersPage />} />
+              <Route path="/users/create"   element={<CreateUserPage />} />
               <Route path="/users/edit/:id" element={<EditUserPage />} />
             </Route>
 
-            {/* Roles (Super Admin) */}
+            {/* Roles — GlobalAdmin only */}
             <Route element={<RoleGuard allowedRoles={['SUPER_ADMIN']} />}>
               <Route path="/roles" element={<RolesPage />} />
             </Route>
 
-            {/* Provider Configurations (Super Admin & Tenant Admin) */}
+            {/* Provider Configurations — GlobalAdmin + TenantAdmin */}
             <Route element={<RoleGuard allowedRoles={['SUPER_ADMIN', 'TENANT_ADMIN']} />}>
-              <Route path="/providers" element={<ProviderConfigurationsPage />} />
+              <Route path="/providers"        element={<ProviderConfigurationsPage />} />
               <Route path="/providers/create" element={<CreateProviderPage />} />
             </Route>
 
-            {/* Notifications (Accessible to all authenticated users) */}
-            <Route path="/notifications" element={<NotificationsPage />} />
-            <Route path="/notifications/send" element={<SendNotificationPage />} />
-            {/* Task 14: Send Email via real backend API */}
-            <Route path="/notifications/send-email" element={<SendEmailPage />} />
-            <Route path="/notifications/history" element={<NotificationHistoryPage />} />
-            <Route path="/notifications/:id" element={<NotificationDetailsPage />} />
+            {/* Notifications — all authenticated roles */}
+            <Route path="/notifications"            element={<NotificationsPage />} />
+            <Route path="/notifications/send"        element={<SendNotificationPage />} />
+            <Route path="/notifications/send-email"  element={<SendEmailPage />} />
+            <Route path="/notifications/history"     element={<NotificationHistoryPage />} />
+            <Route path="/notifications/:id"         element={<NotificationDetailsPage />} />
 
             {/* Profile */}
             <Route path="/profile" element={<ProfilePage />} />
           </Route>
         </Route>
 
-        {/* Fallback */}
+        {/* ── Fallback ─────────────────────────────────────────────────────── */}
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </BrowserRouter>
