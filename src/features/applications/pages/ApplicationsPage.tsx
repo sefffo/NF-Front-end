@@ -4,32 +4,38 @@ import { PageHeader } from '../../../components/layout/PageHeader';
 import { Table, Column } from '../../../components/common/Table';
 import { StatusBadge } from '../../../components/common/StatusBadge';
 import { Button } from '../../../components/common/Button';
-import { Plus, Eye } from 'lucide-react';
+import { Plus, Eye, RefreshCw } from 'lucide-react';
 import { Application } from '../../../types/application';
 import { applicationsApi } from '../api/applicationsApi';
 import { TenantContext } from '../../../app/providers';
 
 export const ApplicationsPage: React.FC = () => {
-  const navigate = useNavigate();
+  const navigate  = useNavigate();
   const tenantCtx = useContext(TenantContext);
-  const tenantId = tenantCtx?.activeTenant?.id;
+  const tenantId  = tenantCtx?.activeTenant?.id;
 
-  const [apps, setApps] = useState<Application[]>([]);
+  const [apps, setApps]           = useState<Application[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError]         = useState<string | null>(null);
+
+  const load = (id: string) => {
+    setIsLoading(true);
+    setError(null);
+    applicationsApi
+      .getApplications(id)
+      .then(setApps)
+      .catch(() => setError('Failed to load applications. Please try again.'))
+      .finally(() => setIsLoading(false));
+  };
 
   useEffect(() => {
     if (!tenantId) {
       setApps([]);
+      setError(null);
       return;
     }
-    setIsLoading(true);
-    setError(null);
-    applicationsApi
-      .getApplications(tenantId)
-      .then(setApps)
-      .catch(() => setError('Failed to load applications. Please try again.'))
-      .finally(() => setIsLoading(false));
+    load(tenantId);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tenantId]);
 
   const columns: Column<Application>[] = [
@@ -80,20 +86,33 @@ export const ApplicationsPage: React.FC = () => {
         title="Applications"
         subtitle="Registered microservices and client applications using the notification engine"
         actions={
-          <Button
-            variant="primary"
-            leftIcon={<Plus size={16} />}
-            onClick={() => navigate('/applications/create')}
-            disabled={!tenantId}
-          >
-            Register Application
-          </Button>
+          <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+            {tenantId && (
+              <Button
+                variant="ghost"
+                size="sm"
+                leftIcon={<RefreshCw size={14} />}
+                onClick={() => load(tenantId)}
+                disabled={isLoading}
+              >
+                Refresh
+              </Button>
+            )}
+            <Button
+              variant="primary"
+              leftIcon={<Plus size={16} />}
+              onClick={() => navigate('/applications/create')}
+              disabled={!tenantId}
+            >
+              Register Application
+            </Button>
+          </div>
         }
       />
 
       {!tenantId && (
         <div role="alert" className="alert alert-error" style={{ marginBottom: 'var(--space-4)' }}>
-          Please select an active tenant to view its applications.
+          No active tenant found. Please log in again or contact your administrator.
         </div>
       )}
 

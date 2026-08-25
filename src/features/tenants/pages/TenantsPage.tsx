@@ -10,14 +10,18 @@ import { tenantsApi } from '../api/tenantsApi';
 
 export const TenantsPage: React.FC = () => {
   const navigate = useNavigate();
-  const [tenants, setTenants] = useState<Tenant[]>([]);
+  const [tenants, setTenants]   = useState<Tenant[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError]         = useState<string | null>(null); // fix: was missing — API failures were silently blank
 
   useEffect(() => {
-    tenantsApi.getTenants().then((data) => {
-      setTenants(data);
-      setIsLoading(false);
-    });
+    setIsLoading(true);
+    setError(null);
+    tenantsApi
+      .getTenants()
+      .then((data) => setTenants(data))
+      .catch(() => setError('Failed to load tenants. Please refresh the page.'))
+      .finally(() => setIsLoading(false));
   }, []);
 
   const columns: Column<Tenant>[] = [
@@ -90,11 +94,21 @@ export const TenantsPage: React.FC = () => {
         title="Tenant Organizations"
         subtitle="Manage multi-tenant isolation, quotas, API keys, and settings"
         actions={
-          <Button variant="primary" leftIcon={<Plus size={16} />} onClick={() => navigate('/tenants/create')}>
+          <Button
+            variant="primary"
+            leftIcon={<Plus size={16} />}
+            onClick={() => navigate('/tenants/create')}
+          >
             Create Tenant
           </Button>
         }
       />
+
+      {error && (
+        <div role="alert" className="alert alert-error" style={{ marginBottom: 'var(--space-4)' }}>
+          {error}
+        </div>
+      )}
 
       <div className="card">
         <Table columns={columns} data={tenants} keyExtractor={(t) => t.id} isLoading={isLoading} />
