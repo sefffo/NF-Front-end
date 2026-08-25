@@ -3,12 +3,12 @@ import { Input } from '../../../components/common/Input';
 import { Button } from '../../../components/common/Button';
 import { CreateTenantPayload } from '../../../types/tenant';
 
-// ─── Validation constants ────────────────────────────────────────────────────
+// ─── Validation constants ────────────────────────────────────────────
 const NAME_MAX_LENGTH = 100;
 const SLUG_MAX_LENGTH = 50;
 const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
-// ─── Validators ──────────────────────────────────────────────────────────────
+// ─── Validators ──────────────────────────────────────────────────
 function validateName(value: string): string {
   if (!value) return 'Tenant name is required.';
   if (value !== value.trimStart()) return 'Name must not have leading whitespace.';
@@ -26,15 +26,22 @@ function validateSlug(value: string): string {
   return '';
 }
 
-// ─── Types ───────────────────────────────────────────────────────────────────
+// ─── Types ────────────────────────────────────────────────────
 export interface TenantFormProps {
   initialValues?: Partial<CreateTenantPayload>;
   onSubmit: (values: CreateTenantPayload) => void;
   isLoading?: boolean;
+  /** Server-side error message to display above the form (e.g. 403, 409, 400) */
+  serverError?: string | null;
 }
 
-// ─── Component ───────────────────────────────────────────────────────────────
-export const TenantForm: React.FC<TenantFormProps> = ({ initialValues, onSubmit, isLoading = false }) => {
+// ─── Component ─────────────────────────────────────────────────
+export const TenantForm: React.FC<TenantFormProps> = ({
+  initialValues,
+  onSubmit,
+  isLoading = false,
+  serverError,
+}) => {
   const [name, setName] = useState(initialValues?.name || '');
   const [slug, setSlug] = useState(initialValues?.slug || '');
   const [maxApplications, setMaxApplications] = useState(initialValues?.settings?.maxApplications || 5);
@@ -44,19 +51,17 @@ export const TenantForm: React.FC<TenantFormProps> = ({ initialValues, onSubmit,
   const [customDomain, setCustomDomain] = useState(initialValues?.settings?.customDomain || '');
   const [supportEmail, setSupportEmail] = useState(initialValues?.settings?.supportEmail || '');
 
-  // Per-field error state — only shown after blur or a failed submit attempt
   const [nameError, setNameError] = useState('');
   const [slugError, setSlugError] = useState('');
   const [touched, setTouched] = useState({ name: false, slug: false });
 
-  // ── Handlers ──────────────────────────────────────────────────────────────
+  // ── Handlers ───────────────────────────────────────────────────────
 
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setName(value);
     if (touched.name) setNameError(validateName(value));
 
-    // Auto-derive slug from name when slug is empty
     if (!slug) {
       const derived = value
         .toLowerCase()
@@ -68,10 +73,7 @@ export const TenantForm: React.FC<TenantFormProps> = ({ initialValues, onSubmit,
   };
 
   const handleSlugChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    // Normalize: always lowercase, strip any character that isn't alphanumeric or hyphen
-    const normalized = e.target.value
-      .toLowerCase()
-      .replace(/[^a-z0-9-]/g, '');
+    const normalized = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '');
     setSlug(normalized);
     if (touched.slug) setSlugError(validateSlug(normalized));
   };
@@ -86,12 +88,10 @@ export const TenantForm: React.FC<TenantFormProps> = ({ initialValues, onSubmit,
     setSlugError(validateSlug(slug));
   };
 
-  // ── Submit ────────────────────────────────────────────────────────────────
+  // ── Submit ───────────────────────────────────────────────────────────
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-
-    // Mark all validated fields as touched so errors become visible
     setTouched({ name: true, slug: true });
 
     const finalSlug = slug || name.toLowerCase().trim().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
@@ -102,7 +102,6 @@ export const TenantForm: React.FC<TenantFormProps> = ({ initialValues, onSubmit,
     setNameError(nErr);
     setSlugError(sErr);
 
-    // Block submission if any field is invalid
     if (nErr || sErr) return;
 
     onSubmit({
@@ -121,6 +120,13 @@ export const TenantForm: React.FC<TenantFormProps> = ({ initialValues, onSubmit,
 
   return (
     <form onSubmit={handleSubmit} className="form-stack" noValidate>
+      {/* ─── Server-side error banner ─── */}
+      {serverError && (
+        <div role="alert" className="alert alert-error">
+          <span>{serverError}</span>
+        </div>
+      )}
+
       <Input
         label="Tenant / Organization Name"
         value={name}
