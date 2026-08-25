@@ -37,6 +37,22 @@ interface TenantListDto {
   createdAt: string;
 }
 
+// ─── Shape returned by GET /api/tenants/{id} (TenantDto) ─────────────────────
+export interface TenantDto {
+  tenantId: string;
+  name: string;
+  slug: string;
+  status: string;
+  maxAllowedApplications: number;
+  maxDailyNotifications: number;
+  applicationCount: number;
+  userCount: number;
+  supportEmail?: string;
+  customDomain?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 // ─── Mock data kept so existing imports don't break ──────────────────────────
 export const MOCK_TENANTS: Tenant[] = [];
 
@@ -62,26 +78,10 @@ export const tenantsApi = {
     }));
   },
 
-  // GET /api/tenants/{id} — real API
-  getTenantById: async (id: string): Promise<Tenant | undefined> => {
-    const response = await api.get<TenantListDto>(`/tenants/${id}`);
-    const dto = response.data;
-    return {
-      id: dto.tenantId,
-      name: dto.name,
-      slug: dto.slug,
-      status: dto.status.toUpperCase() as Tenant['status'],
-      apiKey: dto.apiKeyMasked,
-      settings: {
-        maxApplications: 0,
-        maxDailyNotifications: dto.maxDailyNotifications,
-        allowedChannels: [],
-      },
-      applicationsCount: dto.applicationCount,
-      usersCount: dto.userCount,
-      createdAt: dto.createdAt,
-      updatedAt: dto.createdAt,
-    };
+  // GET /api/tenants/{id} — real API — maps full TenantDto (all 12 fields)
+  getTenantById: async (id: string): Promise<TenantDto> => {
+    const response = await api.get<TenantDto>(`/tenants/${id}`);
+    return response.data;
   },
 
   // POST /api/tenants — real API (flat payload matching CreateTenantCommand)

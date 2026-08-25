@@ -15,22 +15,22 @@ interface ApplicationListDto {
 }
 
 // Shape returned by GET /api/applications/{id} (ApplicationDto)
-interface ApplicationDto {
+export interface ApplicationDto {
   applicationId: string;
   tenantId: string;
   name: string;
   slug: string;
   environment: string;
   status: string;
-  clientKeyMasked: string;
   description?: string;
   createdAt: string;
+  updatedAt: string;
 }
 
 // Mock data kept so any existing import compiles — no longer used at runtime
 export const MOCK_APPLICATIONS: Application[] = [];
 
-function mapDto(dto: ApplicationListDto | ApplicationDto): Application {
+function mapListDto(dto: ApplicationListDto): Application {
   return {
     id: dto.applicationId,
     tenantId: dto.tenantId,
@@ -48,13 +48,13 @@ export const applicationsApi = {
   // GET /api/tenants/{tenantId}/applications — real API
   getApplications: async (tenantId: string): Promise<Application[]> => {
     const res = await api.get<ApplicationListDto[]>(`/tenants/${tenantId}/applications`);
-    return res.data.map(mapDto);
+    return res.data.map(mapListDto);
   },
 
-  // GET /api/applications/{id} — real API
-  getApplicationById: async (id: string): Promise<Application> => {
+  // GET /api/applications/{id} — real API — returns full ApplicationDto
+  getApplicationById: async (id: string): Promise<ApplicationDto> => {
     const res = await api.get<ApplicationDto>(`/applications/${id}`);
-    return mapDto(res.data);
+    return res.data;
   },
 
   // POST /api/tenants/{tenantId}/applications — real API
