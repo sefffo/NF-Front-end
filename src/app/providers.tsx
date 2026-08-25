@@ -23,39 +23,38 @@ interface TenantContextType {
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const TenantContext = createContext<TenantContextType | undefined>(undefined);
 
-// Build a minimal Tenant shell from what the JWT already gives us.
-// Used for TenantAdmin users so ApplicationsPage has a tenantId to call
-// GET /api/tenants/{tenantId}/applications — the real counts/settings
-// are not needed for that call, so stubs are fine.
+// Build a minimal Tenant shell from JWT claims.
+// Used for TenantAdmin so ApplicationsPage always has a tenantId available.
+// tenantName is now correctly populated from the JWT (fixed in authApi.ts).
 function buildTenantShellFromUser(user: AuthUser): Tenant | null {
   if (!user.tenantId) return null;
   return {
-    id:    user.tenantId,
-    name:  user.tenantName ?? 'My Tenant',
-    slug:  '',
+    id:     user.tenantId,
+    name:   user.tenantName ?? user.email, // fix: fall back to email if tenantName still missing
+    slug:   '',
     status: 'ACTIVE',
     apiKey: '',
     settings: {
-      maxApplications: 0,
+      maxApplications:       0,
       maxDailyNotifications: 0,
-      allowedChannels: [],
+      allowedChannels:       [],
     },
     applicationsCount: 0,
-    usersCount: 0,
-    createdAt: '',
-    updatedAt: '',
+    usersCount:        0,
+    createdAt:         '',
+    updatedAt:         '',
   };
 }
 
 export const AppProviders: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<AuthUser | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [tenants, setTenants] = useState<Tenant[]>([]);
-  const [activeTenant, setActiveTenant] = useState<Tenant | null>(null);
+  const [user, setUser]                   = useState<AuthUser | null>(null);
+  const [isLoading, setIsLoading]         = useState<boolean>(true);
+  const [tenants, setTenants]             = useState<Tenant[]>([]);
+  const [activeTenant, setActiveTenant]   = useState<Tenant | null>(null);
 
   // Restore session from localStorage on mount
   useEffect(() => {
-    const token = localStorage.getItem('auth_token');
+    const token     = localStorage.getItem('auth_token');
     const savedUser = localStorage.getItem('auth_user');
     if (token && savedUser) {
       try {
@@ -73,15 +72,19 @@ export const AppProviders: React.FC<{ children: React.ReactNode }> = ({ children
 
     if (user.role === 'SUPER_ADMIN') {
       // GlobalAdmin: fetch all tenants and set first as active
-      tenantsApi.getTenants().then((data) => {
-        setTenants(data);
-        if (data.length > 0) setActiveTenant(data[0]);
-      }).catch(() => {
-        // Swallow — tenants list stays empty, user can still navigate
-      });
+      tenantsApi
+        .getTenants()
+        .then((data) => {
+          setTenants(data);
+          if (data.length > 0) setActiveTenant(data[0]);
+        })
+        .catch((err) => {
+          // fix: was a silent swallow — log the error so it shows in devtools
+          console.error('[AppProviders] Failed to load tenants on login:', err);
+          // activeTenant stays null; ApplicationsPage shows a clear "select tenant" alert
+        });
     } else if (user.role === 'TENANT_ADMIN') {
-      // TenantAdmin: their tenantId is in the JWT — seed activeTenant immediately
-      // so ApplicationsPage can call GET /api/tenants/{tenantId}/applications.
+      // TenantAdmin: seed activeTenant from JWT claims immediately.
       // getTenants() returns 403 for TenantAdmin, so we never call it.
       const shell = buildTenantShellFromUser(user);
       if (shell) {
@@ -135,7 +138,7 @@ export const AppProviders: React.FC<{ children: React.ReactNode }> = ({ children
   );
 };
 
-// ─── Convenience hooks ────────────────────────────────────────────────────────
+// ─── Convenience hooks ───────────────────────────────────────────────────────────
 export const useAuth = () => {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error('useAuth must be used inside AppProviders');
