@@ -1,5 +1,7 @@
+import api from '../../../api/axios';
 import { Tenant, CreateTenantPayload, UpdateTenantPayload } from '../../../types/tenant';
 
+// ─── Mock data (used by GET endpoints until those are integrated) ─────────────
 export const MOCK_TENANTS: Tenant[] = [
   {
     id: 'tnt_acme',
@@ -59,25 +61,17 @@ export const tenantsApi = {
     await new Promise((r) => setTimeout(r, 300));
     return MOCK_TENANTS;
   },
+
   getTenantById: async (id: string): Promise<Tenant | undefined> => {
     return MOCK_TENANTS.find((t) => t.id === id);
   },
+
+  // ── Real integration ──────────────────────────────────────────────────────
   createTenant: async (payload: CreateTenantPayload): Promise<Tenant> => {
-    const newTenant: Tenant = {
-      id: 'tnt_' + Date.now(),
-      name: payload.name,
-      slug: payload.slug,
-      status: payload.status || 'ACTIVE',
-      apiKey: 'ntf_live_' + payload.slug + '_' + Math.random().toString(36).substring(2, 10),
-      settings: payload.settings,
-      applicationsCount: 0,
-      usersCount: 1,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    MOCK_TENANTS.push(newTenant);
-    return newTenant;
+    const response = await api.post<Tenant>('/tenants', payload);
+    return response.data;
   },
+
   updateTenant: async (payload: UpdateTenantPayload): Promise<Tenant> => {
     const index = MOCK_TENANTS.findIndex((t) => t.id === payload.id);
     if (index === -1) throw new Error('Tenant not found');
