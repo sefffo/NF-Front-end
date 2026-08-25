@@ -16,25 +16,23 @@ interface BackendLoginResponse {
   user: {
     userId: string;
     email: string;
-    fullName: string;      // backend sends fullName, frontend AuthUser needs firstName + lastName
-    roles: string[];       // backend sends array, frontend AuthUser uses single role
+    fullName: string;          // backend sends fullName, frontend AuthUser needs firstName + lastName
+    roles: string[];           // backend sends array, frontend AuthUser uses single role
     tenantId: string | null;
+    tenantName: string | null; // populated for TenantAdmin users from JWT claims
     applicationId: string | null;
   };
 }
 
 // ─── Map backend response → frontend AuthResponse shape ────────────────────────────
-// AuthResponse.token is what providers.tsx reads as res.token
-// AuthUser.role is what RoleGuard & DashboardRoleRouter read
 function mapToAuthResponse(raw: BackendLoginResponse): AuthResponse {
   const [firstName = '', ...rest] = (raw.user.fullName ?? '').split(' ');
   const lastName = rest.join(' ');
 
-  // Map backend role strings to frontend UserRole enum.
+  // Map backend role strings → frontend UserRole enum.
   // Backend seeds two accepted aliases for the top-level admin role:
   //   'GlobalAdmin'  (current seeder — DatabaseSeeder.cs)
   //   'SuperAdmin'   (future / alternative naming)
-  // Both map to SUPER_ADMIN so the frontend permissions are identical.
   const rawRole = (raw.user.roles?.[0] ?? 'User').toLowerCase();
   const role =
     rawRole === 'superadmin'  ? 'SUPER_ADMIN'  as const :
@@ -49,6 +47,7 @@ function mapToAuthResponse(raw: BackendLoginResponse): AuthResponse {
     lastName,
     role,
     tenantId:   raw.user.tenantId   ?? undefined,
+    tenantName: raw.user.tenantName ?? undefined, // fix: was missing — TenantAdmin shell used 'My Tenant' fallback
     permissions: {
       canManageTenants:       role === 'SUPER_ADMIN',
       canManageApplications:  role !== 'USER',
@@ -62,7 +61,7 @@ function mapToAuthResponse(raw: BackendLoginResponse): AuthResponse {
   };
 
   return {
-    token:        raw.accessToken,   // ← providers.tsx reads res.token
+    token:        raw.accessToken,
     refreshToken: raw.refreshToken,
     user,
   };
@@ -78,28 +77,14 @@ function extractMessage(err: AxiosError): string {
   );
 }
 
-// ─── authApi object — exported as named export to match providers.tsx import shape ───────
-// providers.tsx does: import { authApi } from '...' and calls authApi.login(credentials)
 export const authApi = {
-  /**
-   * POST /api/auth/login
-   * Stores accessToken as 'auth_token' (key the axios interceptor reads)
-   * and refreshToken as 'refresh_token'.
-   * Returns AuthResponse so providers.tsx can do: res.token, res.user
-   */
   async login(credentials: LoginCredentials): Promise<AuthResponse> {
     const { data } = await authClient.post<BackendLoginResponse>('/auth/login', credentials);
-    // Store tokens for the shared axios interceptor
     localStorage.setItem('auth_token',    data.accessToken);
     localStorage.setItem('refresh_token', data.refreshToken);
-    const mapped = mapToAuthResponse(data);
-    return mapped;
+    return mapToAuthResponse(data);
   },
 
-  /**
-   * POST /api/auth/refresh
-   * Rotates both tokens in localStorage.
-   */
   async refresh(refreshToken: string): Promise<{ token: string; refreshToken: string }> {
     const { data } = await authClient.post<BackendLoginResponse>('/auth/refresh', { refreshToken });
     localStorage.setItem('auth_token',    data.accessToken);
@@ -107,16 +92,11 @@ export const authApi = {
     return { token: data.accessToken, refreshToken: data.refreshToken };
   },
 
-  /**
-   * POST /api/auth/logout
-   * Always clears localStorage even if the server call fails.
-   */
   async logout(): Promise<void> {
     const refreshToken = localStorage.getItem('refresh_token') ?? '';
     try {
       await authClient.post('/auth/logout', { refreshToken });
     } catch (err) {
-      // Swallow — we still clear local state
       console.warn('Logout endpoint error:', extractMessage(err as AxiosError));
     } finally {
       localStorage.removeItem('auth_token');
@@ -125,5 +105,4 @@ export const authApi = {
   },
 };
 
-// ─── Also export individual types for consumers that need them ──────────────────────
 export type { AuthResponse, LoginCredentials };
