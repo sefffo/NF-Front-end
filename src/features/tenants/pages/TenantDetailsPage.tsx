@@ -18,7 +18,16 @@ import {
 import { PageHeader } from '../../../components/layout/PageHeader';
 import { StatusBadge } from '../../../components/common/StatusBadge';
 import { Button } from '../../../components/common/Button';
-import { tenantsApi, TenantDto } from '../api/tenantsApi';
+import { tenantsApi, TenantDto, TenantProfileDto } from '../api/tenantsApi';
+
+// ─── Unified view model ───────────────────────────────────────────────────────
+// Both TenantDto (GlobalAdmin) and TenantProfileDto (TenantAdmin) share these
+// fields. Fields only present in TenantDto are optional here.
+type TenantView = TenantProfileDto & {
+  tenantId?: string;   // GlobalAdmin only
+  slug?: string;       // GlobalAdmin only
+  updatedAt?: string;  // GlobalAdmin only
+};
 
 // ─── Tiny copy-to-clipboard hook ─────────────────────────────────────────────
 function useCopy(ms = 2000) {
@@ -33,8 +42,8 @@ function useCopy(ms = 2000) {
 }
 
 // ─── Skeleton block ───────────────────────────────────────────────────────────
-const Skeleton: React.FC<{ className?: string }> = ({ className = '' }) => (
-  <div className={`skeleton ${className}`} style={{ borderRadius: 'var(--radius-sm)' }} />
+const Skeleton: React.FC<{ className?: string; style?: React.CSSProperties }> = ({ className = '', style }) => (
+  <div className={`skeleton ${className}`} style={{ borderRadius: 'var(--radius-sm)', ...style }} />
 );
 
 // ─── Detail row ───────────────────────────────────────────────────────────────
@@ -79,9 +88,7 @@ const QuotaBar: React.FC<{ used: number; max: number; label: string }> = ({ used
         }}
       >
         <span>{label}</span>
-        <span>
-          {used} / {max}
-        </span>
+        <span>{used} / {max}</span>
       </div>
       <div
         style={{
@@ -110,7 +117,7 @@ export const TenantDetailsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
-  const [tenant, setTenant] = useState<TenantDto | null>(null);
+  const [tenant, setTenant] = useState<TenantView | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -122,21 +129,23 @@ export const TenantDetailsPage: React.FC = () => {
       if (!id) return;
       quiet ? setIsRefreshing(true) : setIsLoading(true);
       setError(null);
+
+      // getTenantById returns TenantDto for GlobalAdmin, TenantProfileDto for TenantAdmin.
+      // Both shapes are compatible with TenantView (TenantDto fields are optional).
       tenantsApi
         .getTenantById(id)
-        .then(setTenant)
+        .then((data) => setTenant(data as TenantView))
         .catch((err: unknown) => {
           if (axios.isAxiosError(err)) {
-            if (err.response?.status === 404) {
-              setError('Tenant not found.');
-            } else if (err.response?.status === 403) {
-              setError("You don't have permission to view this tenant.");
-            } else {
-              setError('Failed to load tenant details. Please try again.');
-            }
+            const status = err.response?.status;
+            if (status === 404) setError('Tenant not found.');
+            else if (status === 403) setError("You don't have permission to view this tenant.");
+            else if (status === 401) setError('Session expired. Please log in again.');
+            else setError(`Failed to load tenant details. (HTTP ${status ?? 'network error'})`);
           } else {
             setError('An unexpected error occurred.');
           }
+          console.error('[TenantDetailsPage] load error:', err);
         })
         .finally(() => {
           setIsLoading(false);
@@ -146,39 +155,37 @@ export const TenantDetailsPage: React.FC = () => {
     [id],
   );
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  useEffect(() => { load(); }, [load]);
 
   // ── Skeleton loading state ────────────────────────────────────────────────
   if (isLoading) {
     return (
       <div className="page-container-inner">
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', marginBottom: 'var(--space-6)' }}>
-          <Skeleton className="skeleton-text" style={{ width: 80, height: 32 }} />
-          <Skeleton className="skeleton-heading" style={{ width: 220, height: 28 }} />
+          <Skeleton style={{ width: 80, height: 32 }} />
+          <Skeleton style={{ width: 220, height: 28 }} />
         </div>
         <div className="stats-grid" style={{ marginBottom: 'var(--space-6)' }}>
           {[0, 1, 2, 3].map((i) => (
             <div key={i} className="stat-card">
               <Skeleton style={{ width: 40, height: 40, borderRadius: 'var(--radius-md)' }} />
               <div style={{ flex: 1 }}>
-                <Skeleton className="skeleton-text" style={{ width: '60%', height: 12 }} />
-                <Skeleton className="skeleton-text" style={{ width: '80%', height: 20 }} />
+                <Skeleton style={{ width: '60%', height: 12, marginBottom: 6 }} />
+                <Skeleton style={{ width: '80%', height: 20 }} />
               </div>
             </div>
           ))}
         </div>
         <div className="card card-padded">
           {[0, 1, 2, 3, 4].map((i) => (
-            <Skeleton key={i} className="skeleton-text" style={{ height: 40, marginBottom: 8 }} />
+            <Skeleton key={i} style={{ height: 40, marginBottom: 8 }} />
           ))}
         </div>
       </div>
     );
   }
 
-  // ── Error / 404 state ─────────────────────────────────────────────────────
+  // ── Error / not found state ───────────────────────────────────────────────
   if (error || !tenant) {
     return (
       <div className="page-container-inner">
@@ -210,23 +217,24 @@ export const TenantDetailsPage: React.FC = () => {
       minute: '2-digit',
     });
 
+  // Is this a full GlobalAdmin view (TenantDto) or a safe TenantAdmin view (TenantProfileDto)?
+  const isFullView = !!tenant.tenantId;
+
   return (
     <div className="page-container-inner">
       {/* ── Header ── */}
       <PageHeader
         title={tenant.name}
-        subtitle={`Slug: ${tenant.slug}`}
+        subtitle={isFullView ? `Slug: ${tenant.slug}` : undefined}
         actions={
           <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
             <Button
               variant="ghost"
               size="sm"
               leftIcon={
-                isRefreshing ? (
-                  <RefreshCw size={14} style={{ animation: 'spin 1s linear infinite' }} />
-                ) : (
-                  <RefreshCw size={14} />
-                )
+                isRefreshing
+                  ? <RefreshCw size={14} style={{ animation: 'spin 1s linear infinite' }} />
+                  : <RefreshCw size={14} />
               }
               onClick={() => load(true)}
               disabled={isRefreshing}
@@ -247,9 +255,7 @@ export const TenantDetailsPage: React.FC = () => {
       {/* ── Stats row ── */}
       <div className="stats-grid" style={{ marginBottom: 'var(--space-6)' }}>
         <div className="stat-card">
-          <div className="stat-icon icon-purple">
-            <Building2 size={20} />
-          </div>
+          <div className="stat-icon icon-purple"><Building2 size={20} /></div>
           <div className="stat-content">
             <span className="stat-label">Status</span>
             <StatusBadge status={tenant.status} />
@@ -257,26 +263,18 @@ export const TenantDetailsPage: React.FC = () => {
         </div>
 
         <div className="stat-card">
-          <div className="stat-icon icon-blue">
-            <AppWindow size={20} />
-          </div>
+          <div className="stat-icon icon-blue"><AppWindow size={20} /></div>
           <div className="stat-content">
             <span className="stat-label">Applications</span>
             <span className="stat-value">
               {tenant.applicationCount} / {tenant.maxAllowedApplications}
             </span>
-            <QuotaBar
-              used={tenant.applicationCount}
-              max={tenant.maxAllowedApplications}
-              label="Used"
-            />
+            <QuotaBar used={tenant.applicationCount} max={tenant.maxAllowedApplications} label="Used" />
           </div>
         </div>
 
         <div className="stat-card">
-          <div className="stat-icon icon-emerald">
-            <Users size={20} />
-          </div>
+          <div className="stat-icon icon-emerald"><Users size={20} /></div>
           <div className="stat-content">
             <span className="stat-label">Users</span>
             <span className="stat-value">{tenant.userCount} Active</span>
@@ -284,30 +282,18 @@ export const TenantDetailsPage: React.FC = () => {
         </div>
 
         <div className="stat-card">
-          <div className="stat-icon icon-amber">
-            <Bell size={20} />
-          </div>
+          <div className="stat-icon icon-amber"><Bell size={20} /></div>
           <div className="stat-content">
             <span className="stat-label">Daily Notifications</span>
-            <span className="stat-value">
-              {tenant.maxDailyNotifications.toLocaleString()} / day
-            </span>
+            <span className="stat-value">{tenant.maxDailyNotifications.toLocaleString()} / day</span>
           </div>
         </div>
       </div>
 
       {/* ── Configuration ── */}
       <div className="card card-padded" style={{ marginBottom: 'var(--space-4)' }}>
-        <h3 style={{ marginBottom: 'var(--space-1)', fontSize: 'var(--text-lg)' }}>
-          Configuration
-        </h3>
-        <p
-          style={{
-            color: 'var(--color-text-muted)',
-            fontSize: 'var(--text-sm)',
-            marginBottom: 'var(--space-4)',
-          }}
-        >
+        <h3 style={{ marginBottom: 'var(--space-1)', fontSize: 'var(--text-lg)' }}>Configuration</h3>
+        <p style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)', marginBottom: 'var(--space-4)' }}>
           Tenant-level settings and contact information
         </p>
 
@@ -315,13 +301,9 @@ export const TenantDetailsPage: React.FC = () => {
           icon={<Mail size={16} />}
           label="Support Email"
           value={
-            tenant.supportEmail ? (
-              <a href={`mailto:${tenant.supportEmail}`} style={{ color: 'var(--color-primary)' }}>
-                {tenant.supportEmail}
-              </a>
-            ) : (
-              <span style={{ color: 'var(--color-text-faint)' }}>Not configured</span>
-            )
+            tenant.supportEmail
+              ? <a href={`mailto:${tenant.supportEmail}`} style={{ color: 'var(--color-primary)' }}>{tenant.supportEmail}</a>
+              : <span style={{ color: 'var(--color-text-faint)' }}>Not configured</span>
           }
         />
 
@@ -329,9 +311,8 @@ export const TenantDetailsPage: React.FC = () => {
           icon={<Globe size={16} />}
           label="Custom Domain"
           value={
-            tenant.customDomain ?? (
-              <span style={{ color: 'var(--color-text-faint)' }}>Not configured</span>
-            )
+            tenant.customDomain
+              ?? <span style={{ color: 'var(--color-text-faint)' }}>Not configured</span>
           }
         />
 
@@ -353,61 +334,55 @@ export const TenantDetailsPage: React.FC = () => {
           value={fmt(tenant.createdAt)}
         />
 
-        <DetailRow
-          icon={<CalendarDays size={16} />}
-          label="Last Updated"
-          value={fmt(tenant.updatedAt)}
-        />
+        {/* updatedAt only available for GlobalAdmin (TenantDto) */}
+        {tenant.updatedAt && (
+          <DetailRow
+            icon={<CalendarDays size={16} />}
+            label="Last Updated"
+            value={fmt(tenant.updatedAt)}
+          />
+        )}
       </div>
 
-      {/* ── Identity ── */}
-      <div className="card card-padded">
-        <h3 style={{ marginBottom: 'var(--space-1)', fontSize: 'var(--text-lg)' }}>
-          Identity
-        </h3>
-        <p
-          style={{
-            color: 'var(--color-text-muted)',
-            fontSize: 'var(--text-sm)',
-            marginBottom: 'var(--space-4)',
-          }}
-        >
-          Immutable identifiers for this tenant
-        </p>
+      {/* ── Identity — GlobalAdmin only ── */}
+      {isFullView && (
+        <div className="card card-padded">
+          <h3 style={{ marginBottom: 'var(--space-1)', fontSize: 'var(--text-lg)' }}>Identity</h3>
+          <p style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)', marginBottom: 'var(--space-4)' }}>
+            Immutable identifiers for this tenant
+          </p>
 
-        <DetailRow
-          icon={<Hash size={16} />}
-          label="Tenant ID"
-          value={
-            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-              <code style={{ fontSize: 'var(--text-xs)' }}>{tenant.tenantId}</code>
-              <button
-                type="button"
-                aria-label="Copy tenant ID"
-                onClick={() => copyId(tenant.tenantId)}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  color: copiedId ? 'var(--color-success)' : 'var(--color-text-muted)',
-                  display: 'flex',
-                  padding: 'var(--space-1)',
-                  borderRadius: 'var(--radius-sm)',
-                  transition: 'color var(--transition-interactive)',
-                }}
-              >
-                {copiedId ? <CheckCheck size={14} /> : <Copy size={14} />}
-              </button>
-            </div>
-          }
-        />
+          <DetailRow
+            icon={<Hash size={16} />}
+            label="Tenant ID"
+            value={
+              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                <code style={{ fontSize: 'var(--text-xs)' }}>{tenant.tenantId}</code>
+                <button
+                  type="button"
+                  aria-label="Copy tenant ID"
+                  onClick={() => copyId(tenant.tenantId!)}
+                  style={{
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    color: copiedId ? 'var(--color-success)' : 'var(--color-text-muted)',
+                    display: 'flex', padding: 'var(--space-1)',
+                    borderRadius: 'var(--radius-sm)',
+                    transition: 'color var(--transition-interactive)',
+                  }}
+                >
+                  {copiedId ? <CheckCheck size={14} /> : <Copy size={14} />}
+                </button>
+              </div>
+            }
+          />
 
-        <DetailRow
-          icon={<Hash size={16} />}
-          label="Slug"
-          value={<code style={{ fontSize: 'var(--text-xs)' }}>{tenant.slug}</code>}
-        />
-      </div>
+          <DetailRow
+            icon={<Hash size={16} />}
+            label="Slug"
+            value={<code style={{ fontSize: 'var(--text-xs)' }}>{tenant.slug}</code>}
+          />
+        </div>
+      )}
     </div>
   );
 };
