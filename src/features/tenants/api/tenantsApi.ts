@@ -25,6 +25,7 @@ export interface CreateTenantResponse {
 }
 
 // ─── Shape returned by GET /api/tenants (TenantListDto) ──────────────────────
+// GlobalAdmin only
 interface TenantListDto {
   tenantId: string;
   name: string;
@@ -37,7 +38,8 @@ interface TenantListDto {
   createdAt: string;
 }
 
-// ─── Shape returned by GET /api/tenants/{id} (TenantDto) ─────────────────────
+// ─── Shape returned by GET /api/tenants/{id} for GlobalAdmin (TenantDto) ─────
+// Includes all internal fields: TenantId, Slug, UpdatedAt, limits, counts
 export interface TenantDto {
   tenantId: string;
   name: string;
@@ -53,11 +55,25 @@ export interface TenantDto {
   updatedAt: string;
 }
 
+// ─── Shape returned by GET /api/tenants/{id} for TenantAdmin (TenantProfileDto)
+// Safe public-facing view — no DB IDs, no Slug, no UpdatedAt
+export interface TenantProfileDto {
+  name: string;
+  status: string;
+  maxAllowedApplications: number;
+  maxDailyNotifications: number;
+  applicationCount: number;
+  userCount: number;
+  supportEmail?: string;
+  customDomain?: string;
+  createdAt: string;
+}
+
 // ─── Mock data kept so existing imports don't break ──────────────────────────
 export const MOCK_TENANTS: Tenant[] = [];
 
 export const tenantsApi = {
-  // GET /api/tenants — real API
+  // GET /api/tenants — GlobalAdmin only
   getTenants: async (): Promise<Tenant[]> => {
     const response = await api.get<TenantListDto[]>('/tenants');
     return response.data.map((dto): Tenant => ({
@@ -78,13 +94,22 @@ export const tenantsApi = {
     }));
   },
 
-  // GET /api/tenants/{id} — real API — maps full TenantDto (all 12 fields)
+  // GET /api/tenants/{id} — GlobalAdmin only
+  // Returns full TenantDto with all internal fields (TenantId, Slug, UpdatedAt)
   getTenantById: async (id: string): Promise<TenantDto> => {
     const response = await api.get<TenantDto>(`/tenants/${id}`);
     return response.data;
   },
 
-  // POST /api/tenants — real API (flat payload matching CreateTenantCommand)
+  // GET /api/tenants/{id} — TenantAdmin only
+  // Returns TenantProfileDto — no DB IDs, no Slug, no UpdatedAt
+  // The id comes from the JWT claims stored in auth state, not user input
+  getTenantProfile: async (id: string): Promise<TenantProfileDto> => {
+    const response = await api.get<TenantProfileDto>(`/tenants/${id}`);
+    return response.data;
+  },
+
+  // POST /api/tenants — GlobalAdmin only
   createTenant: async (payload: CreateTenantPayload): Promise<CreateTenantResponse> => {
     const request: CreateTenantRequest = {
       name: payload.name,
