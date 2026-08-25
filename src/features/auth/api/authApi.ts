@@ -30,11 +30,15 @@ function mapToAuthResponse(raw: BackendLoginResponse): AuthResponse {
   const [firstName = '', ...rest] = (raw.user.fullName ?? '').split(' ');
   const lastName = rest.join(' ');
 
-  // Map backend role strings to frontend UserRole enum
-  // Backend: 'SuperAdmin' | 'TenantAdmin' | 'User'  →  Frontend: 'SUPER_ADMIN' | 'TENANT_ADMIN' | 'USER'
+  // Map backend role strings to frontend UserRole enum.
+  // Backend seeds two accepted aliases for the top-level admin role:
+  //   'GlobalAdmin'  (current seeder — DatabaseSeeder.cs)
+  //   'SuperAdmin'   (future / alternative naming)
+  // Both map to SUPER_ADMIN so the frontend permissions are identical.
   const rawRole = (raw.user.roles?.[0] ?? 'User').toLowerCase();
   const role =
     rawRole === 'superadmin'  ? 'SUPER_ADMIN'  as const :
+    rawRole === 'globaladmin' ? 'SUPER_ADMIN'  as const :
     rawRole === 'tenantadmin' ? 'TENANT_ADMIN' as const :
                                 'USER'         as const;
 
