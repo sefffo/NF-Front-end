@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-<<<<<<< HEAD
 import axios from 'axios';
 import { PageHeader } from '../../../components/layout/PageHeader';
 import { TenantForm } from '../components/TenantForm';
@@ -135,31 +134,13 @@ export const CreateTenantPage: React.FC = () => {
         setServerError(resolveErrorMessage(err.response.status, err.response.data));
       } else {
         setServerError('An unexpected error occurred. Please try again.');
-      }
-=======
-import { PageHeader } from '../../../components/layout/PageHeader';
-import { TenantForm } from '../components/TenantForm';
-import { tenantsApi } from '../api/tenantsApi';
-import { CreateTenantPayload } from '../../../types/tenant';
-
-export const CreateTenantPage: React.FC = () => {
-  const navigate = useNavigate();
-  const [isLoading, setIsLoading] = useState(false);
-
-  const handleSubmit = async (payload: CreateTenantPayload) => {
-    setIsLoading(true);
-    try {
-      await tenantsApi.createTenant(payload);
-      navigate('/tenants');
->>>>>>> develop
-    } finally {
+      }    } finally {
       setIsLoading(false);
     }
   };
 
   return (
-<<<<<<< HEAD
-    <>
+<>
       {createdTenant && (
         <ApiKeyModal
           apiKey={createdTenant.apiKey}
@@ -182,15 +163,6 @@ export const CreateTenantPage: React.FC = () => {
           />
         </div>
       </div>
-    </>
-=======
-    <div className="page-container-inner">
-      <PageHeader title="Provision New Tenant" subtitle="Register a new organization workspace with custom API limits" />
-
-      <div className="card card-padded max-w-2xl">
-        <TenantForm onSubmit={handleSubmit} isLoading={isLoading} />
-      </div>
-    </div>
->>>>>>> develop
-  );
+    </>  );
 };
+

@@ -4,18 +4,12 @@ import { PageHeader } from '../../../components/layout/PageHeader';
 import { Table, Column } from '../../../components/common/Table';
 import { StatusBadge } from '../../../components/common/StatusBadge';
 import { Button } from '../../../components/common/Button';
-<<<<<<< HEAD
-import { Plus, Eye, RefreshCw } from 'lucide-react';
-=======
-import { Plus, AppWindow, Eye } from 'lucide-react';
->>>>>>> develop
-import { Application } from '../../../types/application';
+import { Plus, Eye, RefreshCw } from 'lucide-react';import { Application } from '../../../types/application';
 import { applicationsApi } from '../api/applicationsApi';
 import { TenantContext } from '../../../app/providers';
 
 export const ApplicationsPage: React.FC = () => {
-<<<<<<< HEAD
-  const navigate  = useNavigate();
+const navigate  = useNavigate();
   const tenantCtx = useContext(TenantContext);
   const tenantId  = tenantCtx?.activeTenant?.id;
 
@@ -42,20 +36,6 @@ export const ApplicationsPage: React.FC = () => {
     load(tenantId);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tenantId]);
-=======
-  const navigate = useNavigate();
-  const tenantCtx = useContext(TenantContext);
-  const [apps, setApps] = useState<Application[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    applicationsApi.getApplications(tenantCtx?.activeTenant?.id).then((data) => {
-      setApps(data);
-      setIsLoading(false);
-    });
-  }, [tenantCtx?.activeTenant?.id]);
->>>>>>> develop
-
   const columns: Column<Application>[] = [
     {
       key: 'name',
@@ -63,12 +43,7 @@ export const ApplicationsPage: React.FC = () => {
       render: (app) => (
         <div>
           <strong>{app.name}</strong>
-<<<<<<< HEAD
-          {app.description && <div className="text-muted text-xs">{app.description}</div>}
-=======
-          <div className="text-muted text-xs">{app.description}</div>
->>>>>>> develop
-        </div>
+{app.description && <div className="text-muted text-xs">{app.description}</div>}        </div>
       ),
     },
     {
@@ -77,26 +52,14 @@ export const ApplicationsPage: React.FC = () => {
       render: (app) => <StatusBadge status={app.environment} label={app.environment} />,
     },
     {
-<<<<<<< HEAD
-      key: 'status',
+key: 'status',
       header: 'Status',
       render: (app) => <StatusBadge status={app.status} label={app.status} />,
     },
     {
       key: 'clientKeyMasked',
       header: 'Client Key',
-      render: (app) => <code className="text-xs">{app.clientKeyMasked}</code>,
-=======
-      key: 'appKey',
-      header: 'App Key',
-      render: (app) => <code>{app.appKey}</code>,
-    },
-    {
-      key: 'totalNotificationsSent',
-      header: 'Total Sent',
-      render: (app) => <span>{app.totalNotificationsSent.toLocaleString()}</span>,
->>>>>>> develop
-    },
+      render: (app) => <code className="text-xs">{app.clientKeyMasked}</code>,    },
     {
       key: 'actions',
       header: 'Actions',
@@ -119,8 +82,7 @@ export const ApplicationsPage: React.FC = () => {
         title="Applications"
         subtitle="Registered microservices and client applications using the notification engine"
         actions={
-<<<<<<< HEAD
-          <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+<div style={{ display: 'flex', gap: 'var(--space-2)' }}>
             {tenantId && (
               <Button
                 variant="ghost"
@@ -155,18 +117,10 @@ export const ApplicationsPage: React.FC = () => {
           {error}
         </div>
       )}
-
-=======
-          <Button variant="primary" leftIcon={<Plus size={16} />} onClick={() => navigate('/applications/create')}>
-            Register Application
-          </Button>
-        }
-      />
-
->>>>>>> develop
       <div className="card">
         <Table columns={columns} data={apps} keyExtractor={(a) => a.id} isLoading={isLoading} />
       </div>
     </div>
   );
 };
+

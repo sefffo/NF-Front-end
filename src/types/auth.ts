@@ -19,11 +19,7 @@ export interface AuthUser {
   role: UserRole;
   tenantId?: string;
   tenantName?: string;
-<<<<<<< HEAD
-  applicationId?: string;   // fix: was missing — referenced by SendNotificationPage
-=======
->>>>>>> develop
-  avatarUrl?: string;
+applicationId?: string;   // fix: was missing — referenced by SendNotificationPage  avatarUrl?: string;
   permissions: UserPermissions;
 }
 
@@ -44,3 +40,4 @@ export interface AuthResponse {
   refreshToken: string;
   user: AuthUser;
 }
+

@@ -3,40 +3,22 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
 import { useAuth } from '../../../hooks/useAuth';
 
-<<<<<<< HEAD
 // These match the seeded accounts in DatabaseSeeder.cs
 const DEMO_CREDENTIALS = [
   { label: 'Super Admin',   email: 'admin@system.com',        password: 'Admin@1234', hint: 'Full system access' },
   { label: 'Tenant Admin',  email: 'tenantadmin@system.com',  password: 'Admin@1234', hint: 'Manages one tenant' },
-  { label: 'End User',      email: 'user@system.com',         password: 'Admin@1234', hint: 'View & send only' },
-=======
-const DEMO_CREDENTIALS = [
-  { label: 'Super Admin', email: 'admin@notifications.io', hint: 'Full system access' },
-  { label: 'Tenant Admin', email: 'tenant@acme.io', hint: 'Manages one tenant' },
-  { label: 'End User', email: 'user@acme.io', hint: 'View & send only' },
->>>>>>> develop
-];
+  { label: 'End User',      email: 'user@system.com',         password: 'Admin@1234', hint: 'View & send only' },];
 
 export const LoginPage: React.FC = () => {
   const { login, isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
-<<<<<<< HEAD
-  const [email, setEmail]           = useState('admin@system.com');
+const [email, setEmail]           = useState('admin@system.com');
   const [password, setPassword]     = useState('');
   const [isLoading, setIsLoading]   = useState(false);
   const [error, setError]           = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [mounted, setMounted]       = useState(false);
-=======
-  const [email, setEmail] = useState('admin@notifications.io');
-  const [password, setPassword] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [mounted, setMounted] = useState(false);
->>>>>>> develop
-
   useEffect(() => {
     setMounted(true);
     if (isAuthenticated) navigate('/dashboard', { replace: true });
@@ -51,8 +33,7 @@ export const LoginPage: React.FC = () => {
     setError('');
     setIsLoading(true);
     try {
-<<<<<<< HEAD
-      await login({ email: email.trim(), password });
+await login({ email: email.trim(), password });
       navigate('/dashboard', { replace: true });
     } catch (err: unknown) {
       // Surface the backend error message when available
@@ -62,29 +43,15 @@ export const LoginPage: React.FC = () => {
         axiosErr?.response?.data?.message ??
         axiosErr?.response?.data?.title ??
         null;
-      setError(msg ?? 'Invalid credentials. Please check your email and password.');
-=======
-      await login({ email, password });
-      navigate('/dashboard', { replace: true });
-    } catch {
-      setError('Invalid credentials. Please try again.');
->>>>>>> develop
-    } finally {
+      setError(msg ?? 'Invalid credentials. Please check your email and password.');    } finally {
       setIsLoading(false);
     }
   };
 
-<<<<<<< HEAD
-  // Auto-fill both email and correct password from the seeded account
+// Auto-fill both email and correct password from the seeded account
   const handleDemoSelect = (cred: typeof DEMO_CREDENTIALS[number]) => {
     setEmail(cred.email);
-    setPassword(cred.password);
-=======
-  const handleDemoSelect = (demoEmail: string) => {
-    setEmail(demoEmail);
-    setPassword('demo1234');
->>>>>>> develop
-    setError('');
+    setPassword(cred.password);    setError('');
   };
 
   return (
@@ -143,12 +110,7 @@ export const LoginPage: React.FC = () => {
                 onClick={() => setShowPassword((v) => !v)}
                 aria-label="Toggle password visibility"
               >
-<<<<<<< HEAD
-                {showPassword ? '\uD83D\uDE48' : '\uD83D\uDC41'}
-=======
-                {showPassword ? '🙈' : '👁'}
->>>>>>> develop
-              </button>
+{showPassword ? '\uD83D\uDE48' : '\uD83D\uDC41'}              </button>
             </div>
 
             {/* Forget password link */}
@@ -192,24 +154,14 @@ export const LoginPage: React.FC = () => {
                   key={cred.email}
                   type="button"
                   className={`lp-demo-card ${email === cred.email ? 'lp-demo-card--active' : ''}`}
-<<<<<<< HEAD
-                  onClick={() => handleDemoSelect(cred)}
-=======
-                  onClick={() => handleDemoSelect(cred.email)}
->>>>>>> develop
-                >
+onClick={() => handleDemoSelect(cred)}                >
                   <span className="lp-demo-label">{cred.label}</span>
                   <span className="lp-demo-hint">{cred.hint}</span>
                 </button>
               ))}
             </div>
             <p className="lp-demo-note">
-<<<<<<< HEAD
-              Click a role to auto-fill credentials.
-=======
-              Click a role to auto-fill. Password: <code>demo1234</code>
->>>>>>> develop
-            </p>
+Click a role to auto-fill credentials.            </p>
           </div>
         </div>
 
@@ -217,3 +169,4 @@ export const LoginPage: React.FC = () => {
     </div>
   );
 };
+

@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 import React, { useCallback, useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
@@ -300,57 +299,11 @@ export const TenantDetailsPage: React.FC = () => {
           </div>
           <div className="stat-content">
             <span className="stat-label">Status</span>
-            <StatusBadge status={tenant.status.toUpperCase()} />
-=======
-import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { PageHeader } from '../../../components/layout/PageHeader';
-import { StatusBadge } from '../../../components/common/StatusBadge';
-import { Button } from '../../../components/common/Button';
-import { Key, ArrowLeft, Building2, AppWindow, Users } from 'lucide-react';
-import { Tenant } from '../../../types/tenant';
-import { tenantsApi } from '../api/tenantsApi';
-
-export const TenantDetailsPage: React.FC = () => {
-  const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
-  const [tenant, setTenant] = useState<Tenant | null>(null);
-
-  useEffect(() => {
-    if (id) {
-      tenantsApi.getTenantById(id).then((t) => setTenant(t || null));
-    }
-  }, [id]);
-
-  if (!tenant) {
-    return <div className="p-6">Loading tenant details...</div>;
-  }
-
-  return (
-    <div className="page-container-inner">
-      <PageHeader
-        title={tenant.name}
-        subtitle={`Tenant ID: ${tenant.id} • Slug: ${tenant.slug}`}
-        actions={
-          <Button variant="outline" leftIcon={<ArrowLeft size={16} />} onClick={() => navigate('/tenants')}>
-            Back to Tenants
-          </Button>
-        }
-      />
-
-      <div className="stats-grid">
-        <div className="stat-card">
-          <div className="stat-icon icon-purple"><Building2 size={20} /></div>
-          <div className="stat-content">
-            <span className="stat-label">Status</span>
-            <StatusBadge status={tenant.status} />
->>>>>>> develop
-          </div>
+            <StatusBadge status={tenant.status.toUpperCase()} />          </div>
         </div>
 
         <div className="stat-card">
-<<<<<<< HEAD
-          <div className="stat-icon icon-blue">
+<div className="stat-icon icon-blue">
             <AppWindow size={20} />
           </div>
           <div className="stat-content">
@@ -362,19 +315,11 @@ export const TenantDetailsPage: React.FC = () => {
               used={tenant.applicationCount}
               max={tenant.maxAllowedApplications}
               label="Used"
-            />
-=======
-          <div className="stat-icon icon-blue"><AppWindow size={20} /></div>
-          <div className="stat-content">
-            <span className="stat-label">Applications</span>
-            <span className="stat-value">{tenant.applicationsCount} / {tenant.settings.maxApplications}</span>
->>>>>>> develop
-          </div>
+            />          </div>
         </div>
 
         <div className="stat-card">
-<<<<<<< HEAD
-          <div className="stat-icon icon-emerald">
+<div className="stat-icon icon-emerald">
             <Users size={20} />
           </div>
           <div className="stat-content">
@@ -391,19 +336,11 @@ export const TenantDetailsPage: React.FC = () => {
             <span className="stat-label">Daily Notifications</span>
             <span className="stat-value">
               {tenant.maxDailyNotifications.toLocaleString()} / day
-            </span>
-=======
-          <div className="stat-icon icon-emerald"><Users size={20} /></div>
-          <div className="stat-content">
-            <span className="stat-label">Users</span>
-            <span className="stat-value">{tenant.usersCount} Active</span>
->>>>>>> develop
-          </div>
+            </span>          </div>
         </div>
       </div>
 
-<<<<<<< HEAD
-      {/* ── Configuration ──────────────────────────────────────────────────── */}
+{/* ── Configuration ──────────────────────────────────────────────────── */}
       <div className="card card-padded" style={{ marginBottom: 'var(--space-4)' }}>
         <h3 style={{ marginBottom: 'var(--space-1)', fontSize: 'var(--text-lg)' }}>
           Configuration
@@ -518,19 +455,8 @@ export const TenantDetailsPage: React.FC = () => {
           icon={<Hash size={16} />}
           label="Slug"
           value={<code style={{ fontSize: 'var(--text-xs)' }}>{tenant.slug}</code>}
-        />
-=======
-      <div className="card card-padded mt-6">
-        <h3>API & Security Keys</h3>
-        <div className="api-key-box mt-3">
-          <span>Master API Key:</span>
-          <code>{tenant.apiKey}</code>
-          <Button variant="ghost" size="sm" leftIcon={<Key size={14} />}>
-            Rotate Key
-          </Button>
-        </div>
->>>>>>> develop
-      </div>
+        />      </div>
     </div>
   );
 };
+
