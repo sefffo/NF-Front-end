@@ -5,59 +5,63 @@ import { Table, Column } from '../../../components/common/Table';
 import { StatusBadge } from '../../../components/common/StatusBadge';
 import { Button } from '../../../components/common/Button';
 import { Plus, Eye, Key } from 'lucide-react';
-import { Tenant } from '../../../types/tenant';
-import { tenantsApi } from '../api/tenantsApi';
+import { tenantsApi, TenantListDto } from '../api/tenantsApi';
 
 export const TenantsPage: React.FC = () => {
   const navigate = useNavigate();
-  const [tenants, setTenants]   = useState<Tenant[]>([]);
+  const [tenants, setTenants]     = useState<TenantListDto[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError]         = useState<string | null>(null); // fix: was missing — API failures were silently blank
+  const [error, setError]         = useState<string | null>(null);
 
   useEffect(() => {
     setIsLoading(true);
     setError(null);
     tenantsApi
-      .getTenants()
+      .getTenantsRaw()
       .then((data) => setTenants(data))
       .catch(() => setError('Failed to load tenants. Please refresh the page.'))
       .finally(() => setIsLoading(false));
   }, []);
 
-  const columns: Column<Tenant>[] = [
+  const columns: Column<TenantListDto>[] = [
     {
       key: 'name',
       header: 'Tenant Name',
       render: (t) => (
         <div>
           <strong className="text-brand">{t.name}</strong>
-          <div className="text-muted text-xs">ID: {t.id}</div>
+          <div className="text-muted text-xs">/{t.slug}</div>
         </div>
       ),
     },
     {
       key: 'status',
       header: 'Status',
-      render: (t) => <StatusBadge status={t.status} />,
+      render: (t) => <StatusBadge status={t.status.toUpperCase()} />,
     },
     {
-      key: 'apiKey',
+      key: 'apiKeyMasked',
       header: 'API Key',
       render: (t) => (
         <code className="api-key-code">
-          <Key size={12} className="inline-icon" /> {t.apiKey.substring(0, 16)}...
+          <Key size={12} className="inline-icon" /> {t.apiKeyMasked}
         </code>
       ),
     },
     {
-      key: 'applicationsCount',
+      key: 'applicationCount',
       header: 'Applications',
-      render: (t) => <span>{t.applicationsCount} Apps</span>,
+      render: (t) => <span>{t.applicationCount} Apps</span>,
     },
     {
-      key: 'usersCount',
+      key: 'userCount',
       header: 'Users',
-      render: (t) => <span>{t.usersCount} Users</span>,
+      render: (t) => <span>{t.userCount} Users</span>,
+    },
+    {
+      key: 'maxDailyNotifications',
+      header: 'Daily Limit',
+      render: (t) => <span>{t.maxDailyNotifications.toLocaleString()} / day</span>,
     },
     {
       key: 'createdAt',
@@ -80,7 +84,7 @@ export const TenantsPage: React.FC = () => {
           variant="ghost"
           size="sm"
           leftIcon={<Eye size={14} />}
-          onClick={() => navigate(`/tenants/${t.id}`)}
+          onClick={() => navigate(`/tenants/${t.tenantId}`)}
         >
           Details
         </Button>
@@ -111,7 +115,12 @@ export const TenantsPage: React.FC = () => {
       )}
 
       <div className="card">
-        <Table columns={columns} data={tenants} keyExtractor={(t) => t.id} isLoading={isLoading} />
+        <Table
+          columns={columns}
+          data={tenants}
+          keyExtractor={(t) => t.tenantId}
+          isLoading={isLoading}
+        />
       </div>
     </div>
   );
