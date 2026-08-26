@@ -1,8 +1,12 @@
 import axios from 'axios';
 
 const api = axios.create({
+<<<<<<< HEAD
   // Backend routes are under /api/... (no /v1 segment)
   // Override via VITE_API_BASE_URL in .env.local if your backend runs on a different origin.
+=======
+  // Task 96: backend routes have no version segment (api/...), was '/api/v1'
+>>>>>>> develop
   baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
   headers: {
     'Content-Type': 'application/json',

@@ -19,7 +19,10 @@ export interface AuthUser {
   role: UserRole;
   tenantId?: string;
   tenantName?: string;
+<<<<<<< HEAD
   applicationId?: string;   // fix: was missing — referenced by SendNotificationPage
+=======
+>>>>>>> develop
   avatarUrl?: string;
   permissions: UserPermissions;
 }

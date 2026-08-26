@@ -4,6 +4,7 @@ import react from '@vitejs/plugin-react'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
+<<<<<<< HEAD
   server: {
     proxy: {
       // Proxy all /api/* requests to the .NET backend during local development.
@@ -14,6 +15,14 @@ export default defineConfig({
         target: 'http://localhost:5000',
         changeOrigin: true,
         secure: false,
+=======
+  // Task 96: dev proxy — forwards /api to the local backend, avoids CORS in development
+  server: {
+    proxy: {
+      '/api': {
+        target: 'http://localhost:5000',
+        changeOrigin: true,
+>>>>>>> develop
       },
     },
   },
