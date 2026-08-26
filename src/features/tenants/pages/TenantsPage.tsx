@@ -5,7 +5,6 @@ import { Table, Column } from '../../../components/common/Table';
 import { StatusBadge } from '../../../components/common/StatusBadge';
 import { Button } from '../../../components/common/Button';
 import { Plus, Eye, Key } from 'lucide-react';
-<<<<<<< HEAD
 import { tenantsApi, TenantListDto } from '../api/tenantsApi';
 
 export const TenantsPage: React.FC = () => {
@@ -24,67 +23,30 @@ export const TenantsPage: React.FC = () => {
       .finally(() => setIsLoading(false));
   }, []);
 
-  const columns: Column<TenantListDto>[] = [
-=======
-import { Tenant } from '../../../types/tenant';
-import { tenantsApi } from '../api/tenantsApi';
-
-export const TenantsPage: React.FC = () => {
-  const navigate = useNavigate();
-  const [tenants, setTenants] = useState<Tenant[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    tenantsApi.getTenants().then((data) => {
-      setTenants(data);
-      setIsLoading(false);
-    });
-  }, []);
-
-  const columns: Column<Tenant>[] = [
->>>>>>> develop
-    {
+  const columns: Column<TenantListDto>[] = [    {
       key: 'name',
       header: 'Tenant Name',
       render: (t) => (
         <div>
           <strong className="text-brand">{t.name}</strong>
-<<<<<<< HEAD
-          <div className="text-muted text-xs">/{t.slug}</div>
-=======
-          <div className="text-muted text-xs">ID: {t.id}</div>
->>>>>>> develop
-        </div>
+<div className="text-muted text-xs">/{t.slug}</div>        </div>
       ),
     },
     {
       key: 'status',
       header: 'Status',
-<<<<<<< HEAD
-      render: (t) => <StatusBadge status={t.status.toUpperCase()} />,
+render: (t) => <StatusBadge status={t.status.toUpperCase()} />,
     },
     {
       key: 'apiKeyMasked',
       header: 'API Key',
       render: (t) => (
         <code className="api-key-code">
-          <Key size={12} className="inline-icon" /> {t.apiKeyMasked}
-=======
-      render: (t) => <StatusBadge status={t.status} />,
-    },
-    {
-      key: 'apiKey',
-      header: 'API Key',
-      render: (t) => (
-        <code className="api-key-code">
-          <Key size={12} className="inline-icon" /> {t.apiKey.substring(0, 16)}...
->>>>>>> develop
-        </code>
+          <Key size={12} className="inline-icon" /> {t.apiKeyMasked}        </code>
       ),
     },
     {
-<<<<<<< HEAD
-      key: 'applicationCount',
+key: 'applicationCount',
       header: 'Applications',
       render: (t) => <span>{t.applicationCount} Apps</span>,
     },
@@ -96,18 +58,7 @@ export const TenantsPage: React.FC = () => {
     {
       key: 'maxDailyNotifications',
       header: 'Daily Limit',
-      render: (t) => <span>{t.maxDailyNotifications.toLocaleString()} / day</span>,
-=======
-      key: 'applicationsCount',
-      header: 'Applications',
-      render: (t) => <span>{t.applicationsCount} Apps</span>,
-    },
-    {
-      key: 'usersCount',
-      header: 'Users',
-      render: (t) => <span>{t.usersCount} Users</span>,
->>>>>>> develop
-    },
+      render: (t) => <span>{t.maxDailyNotifications.toLocaleString()} / day</span>,    },
     {
       key: 'createdAt',
       header: 'Created At',
@@ -129,12 +80,7 @@ export const TenantsPage: React.FC = () => {
           variant="ghost"
           size="sm"
           leftIcon={<Eye size={14} />}
-<<<<<<< HEAD
-          onClick={() => navigate(`/tenants/${t.tenantId}`)}
-=======
-          onClick={() => navigate(`/tenants/${t.id}`)}
->>>>>>> develop
-        >
+onClick={() => navigate(`/tenants/${t.tenantId}`)}        >
           Details
         </Button>
       ),
@@ -147,22 +93,16 @@ export const TenantsPage: React.FC = () => {
         title="Tenant Organizations"
         subtitle="Manage multi-tenant isolation, quotas, API keys, and settings"
         actions={
-<<<<<<< HEAD
-          <Button
+<Button
             variant="primary"
             leftIcon={<Plus size={16} />}
             onClick={() => navigate('/tenants/create')}
-          >
-=======
-          <Button variant="primary" leftIcon={<Plus size={16} />} onClick={() => navigate('/tenants/create')}>
->>>>>>> develop
-            Create Tenant
+          >            Create Tenant
           </Button>
         }
       />
 
-<<<<<<< HEAD
-      {error && (
+{error && (
         <div role="alert" className="alert alert-error" style={{ marginBottom: 'var(--space-4)' }}>
           {error}
         </div>
@@ -174,12 +114,8 @@ export const TenantsPage: React.FC = () => {
           data={tenants}
           keyExtractor={(t) => t.tenantId}
           isLoading={isLoading}
-        />
-=======
-      <div className="card">
-        <Table columns={columns} data={tenants} keyExtractor={(t) => t.id} isLoading={isLoading} />
->>>>>>> develop
-      </div>
+        />      </div>
     </div>
   );
 };
+
