@@ -7,13 +7,13 @@ export default defineConfig({
   server: {
     proxy: {
       // Proxy all /api/* requests to the .NET backend during local development.
-      // Override the target via VITE_API_BASE_URL in .env.local if your backend
-      // runs on a different port (e.g. https://localhost:7218).
+      // Backend runs on http://localhost:5000 (launchSettings.json → http profile).
+      // If you run the https profile, change target to https://localhost:7000
+      // and set secure: false.
       '/api': {
-        target: 'http://localhost:5218',
+        target: 'http://localhost:5000',
         changeOrigin: true,
         secure: false,
-        // Rewrite is NOT needed — backend routes already start with /api
       },
     },
   },
